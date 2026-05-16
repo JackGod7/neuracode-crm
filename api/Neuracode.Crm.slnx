@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Neuracode.Crm.Api/Neuracode.Crm.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Neuracode.Crm.Tests/Neuracode.Crm.Tests.csproj" />
+  </Folder>
+</Solution>

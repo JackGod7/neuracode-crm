@@ -1,0 +1,169 @@
+{
+  "env": {
+    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "400000"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(dotnet:*)",
+      "Bash(dotnet new:*)",
+      "Bash(dotnet build:*)",
+      "Bash(dotnet test:*)",
+      "Bash(dotnet run:*)",
+      "Bash(dotnet ef:*)",
+      "Bash(dotnet add:*)",
+      "Bash(dotnet restore:*)",
+      "Bash(dotnet publish:*)",
+      "Bash(dotnet tool:*)",
+      "Bash(dotnet format:*)",
+      "Bash(dotnet sln:*)",
+      "Bash(dotnet user-secrets:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run start:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run seed:*)",
+      "Bash(npm run init:*)",
+      "Bash(npm run local:*)",
+      "Bash(npm run mcp:*)",
+      "Bash(npm install:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(npm test:*)",
+      "Bash(npx drizzle-kit:*)",
+      "Bash(npx tsx:*)",
+      "Bash(npx playwright:*)",
+      "Bash(npx autocannon:*)",
+      "Bash(npx kiota:*)",
+      "Bash(git:*)",
+      "Bash(gh:*)",
+      "Bash(curl:*)",
+      "Bash(ls:*)",
+      "Bash(mkdir:*)",
+      "Bash(node:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(wc:*)",
+      "Bash(docker compose:*)",
+      "Bash(docker build:*)",
+      "Bash(docker run:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker ps:*)",
+      "Bash(sqlite3:*)",
+      "Read(./**)",
+      "Write(./**)",
+      "Edit(./**)",
+      "Glob(./**)",
+      "Grep(./**)",
+      "Bash(rtk gain *)",
+      "Bash(rtk find *)",
+      "Bash(rtk tree *)",
+      "Bash(rtk ls *)",
+      "Bash(rtk git *)",
+      "PowerShell(Remove-Item *)",
+      "Bash(rtk grep *)",
+      "Bash(xargs grep -l \"const.*Schema = z\\\\.\")",
+      "WebSearch",
+      "WebFetch(domain:howborisusesclaudecode.com)",
+      "WebFetch(domain:www.anup.io)",
+      "Bash(Get-ChildItem -Recurse \"C:\\\\Users\\\\jaaguilar\\\\Documents\\\\agencia-ia\\\\neuracode-crm\\\\docs\")",
+      "Bash(Select-Object FullName)",
+      "Bash(xargs sed -i 's/AutoCrm\\\\.Api/Neuracode.Crm.Api/g; s/AutoCrm\\\\.Tests/Neuracode.Crm.Tests/g; s/AutoCrm/Neuracode.Crm/g')",
+      "Bash(rtk dotnet *)",
+      "Bash(xargs sed -i 's/Neuracode\\\\.CrmFactory/NeuracodeFactory/g; s/AutoCrmFactory/NeuracodeFactory/g')",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\jaaguilar\\\\Documents\\\\agencia-ia\\\\neuracode-crm\\\\\" -Depth 0 | ForEach-Object { $_.Name })",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\jaaguilar\\\\Documents\\\\agencia-ia\\\\neuracode-crm\\\\\" -Depth 0 | ForEach-Object { if \\($_.PSIsContainer\\) { \"📁 $\\($_.Name\\)/\" } else { \"📄 $\\($_.Name\\)\" } })",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\jaaguilar\\\\Documents\\\\agencia-ia\\\\neuracode-crm\\\\\" -Depth 0 | Where-Object { -not $_.Name.StartsWith\\('.'\\) -and $_.Name -ne 'node_modules' } | ForEach-Object { if \\($_.PSIsContainer\\) { \"📁 $\\($_.Name\\)/\" } else { \"📄 $\\($_.Name\\)\" } })",
+      "Bash(xargs grep -l \"fetch\\\\|axios\\\\|localhost:5000\\\\|NET_API_URL\")",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\jaaguilar\\\\Documents\\\\agencia-ia\\\\neuracode-crm\\\\docs\\\\\" -Recurse | ForEach-Object { $_.FullName.Replace\\(\"C:\\\\Users\\\\jaaguilar\\\\Documents\\\\agencia-ia\\\\neuracode-crm\\\\\", \"\"\\) })",
+      "WebFetch(domain:developers.facebook.com)",
+      "WebFetch(domain:web.archive.org)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__query-docs",
+      "PowerShell([System.Environment]::GetEnvironmentVariable\\(\"META_VERIFY_TOKEN\"\\); [System.Environment]::GetEnvironmentVariable\\(\"META_ACCESS_TOKEN\"\\); [System.Environment]::GetEnvironmentVariable\\(\"META_PHONE_NUMBER_ID\"\\))",
+      "PowerShell($env:META_VERIFY_TOKEN = \"neuracode-crm-webhook-2026\"; $proc = Start-Process dotnet -ArgumentList \"run\",\"--no-build\",\"--project\",\"api\\\\src\\\\Neuracode.Crm.Api\" -WorkingDirectory \"C:\\\\Users\\\\jaaguilar\\\\Documents\\\\agencia-ia\\\\neuracode-crm\" -PassThru -NoNewWindow; Write-Output \"PID: $\\($proc.Id\\)\"; Start-Sleep -Seconds 5; Write-Output \"API started\")",
+      "PowerShell(netstat *)",
+      "PowerShell(Get-Content *)",
+      "PowerShell(Stop-Process *)",
+      "PowerShell(docker build *)",
+      "PowerShell(docker exec crm-api-test *)",
+      "PowerShell(docker stop crm-api-test)",
+      "PowerShell(docker rm crm-api-test)",
+      "PowerShell(docker network create crm-test-net 2>&1)",
+      "PowerShell(docker stop crm-api-test; docker rm crm-api-test; docker network rm crm-test-net; docker rmi neuracode-crm-api:test curlimages/curl:latest; Write-Output \"cleanup done\")",
+      "Bash(rtk read *)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\jaaguilar\\\\Documents\\\\agencia-ia\\\\neuracode-crm\" -Recurse -Depth 3 -ErrorAction SilentlyContinue | Where-Object { $_.Name -match \"secret|local|config|env\" -and $_.Extension -match \"json|env|yml|yaml|ini\" } | Select-Object FullName)",
+      "WebFetch(domain:www.facebookblueprint.com)",
+      "WebFetch(domain:business.facebook.com)",
+      "Bash(rtk curl *)",
+      "Bash(ConnectionStrings__DefaultConnection=\"Data Source=$\\(pwd\\)/data/crm.db\" dotnet run --project api/src/Neuracode.Crm.Api)",
+      "Bash(cygpath -w \"$\\(pwd\\)/data/crm.db\")",
+      "Bash(ConnectionStrings__DefaultConnection='Data Source=__TRACKED_VAR__' dotnet run --project api/src/Neuracode.Crm.Api)",
+      "Bash(ssh *)",
+      "Bash(Get-ChildItem \"C:\\\\Users\\\\jaaguilar\\\\Documents\\\\agencia-ia\\\\neuracode-crm\\\\web\" -Force)",
+      "Bash(xargs grep -l \"fetch.*api\")",
+      "Bash(xargs -I {} basename {})",
+      "Bash(rtk tsc *)",
+      "Bash(dir \"C:\\\\Users\\\\jaaguilar\\\\Documents\\\\agencia-ia\\\\neuracode-crm\" -Depth 2 -Exclude \".next\",\"node_modules\")",
+      "Bash(findstr /E \"^    \")",
+      "Bash(pkill -f \"ngrok\")",
+      "Bash(pkill -f \"serveo\")",
+      "Bash(pkill -f \"ssh.*serveo\")",
+      "WebFetch(domain:accesoriosparael.store)",
+      "Bash(Select-String \"railway.toml|Dockerfile|nixpacks.toml|.dockerignore\")",
+      "Bash(Get-ChildItem -Name)",
+      "Bash(Select-String \"railway|Dockerfile|nixpacks|dockerignore\")",
+      "WebFetch(domain:twenty.com)",
+      "WebFetch(domain:docs.twenty.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(netstat -ano)",
+      "Bash(rtk npx *)",
+      "Bash(echo \"PID=$!\")",
+      "Bash(awk '/^blob/ {print $3, $4}')",
+      "Bash(Remove-Item -Recurse -Force .git)"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(git push --force:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(docker system prune:*)",
+      "Bash(npm publish:*)",
+      "Bash(dotnet nuget push:*)",
+      "Write(./.env)",
+      "Write(./.env.local)",
+      "Write(./data/crm.db)",
+      "Read(./.env)",
+      "Read(./.env.local)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "Vercel"
+  ],
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NonInteractive -File .claude/hooks/format-on-save.ps1"
+          },
+          {
+            "type": "command",
+            "command": "powershell -NonInteractive -File .claude/hooks/check-file-size.ps1"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -Command \"if (!(Test-Path 'docs/specs') -or !(Get-ChildItem 'docs/specs' -Recurse -Filter '*.md' -ErrorAction SilentlyContinue)) { Write-Host 'BLOCKED: No spec.md in docs/specs/. Create spec before editing code.'; exit 1 }\""
+          }
+        ]
+      }
+    ]
+  }
+}

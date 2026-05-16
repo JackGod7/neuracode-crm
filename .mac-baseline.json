@@ -1,0 +1,44 @@
+{
+  "day_zero": "2026-05-06T04:12:58.326726+00:00",
+  "profile": "prod-saas",
+  "stack_detected": {
+    "languages": [
+      "csharp",
+      "node"
+    ],
+    "test_runners": [
+      "jest",
+      "mocha",
+      "xunit"
+    ],
+    "frameworks": [
+      "aspnet-core",
+      "ef-core",
+      "next",
+      "react"
+    ],
+    "primary_language": "csharp"
+  },
+  "data_quality": "detector_classified",
+  "metrics_snapshot": {
+    "code_loc": 11883,
+    "test_loc": 18997,
+    "spec_loc": 0,
+    "adr_loc": 224,
+    "evals_loc": 0,
+    "docs_other_loc": 3645,
+    "config_loc": 18768,
+    "test_ratio_at_day_zero": 1.5986703694353277,
+    "code_only_commits": 1,
+    "commits_analyzed": 4,
+    "drift_status_at_day_zero": "WARN"
+  },
+  "goals": {
+    "3_months": "test_ratio on NEW commits >= 0.4",
+    "6_months": "test_ratio on NEW commits >= 0.5",
+    "12_months": "specs/ for every public API endpoint"
+  },
+  "freeze_rule": "Day Zero debt is locked. The detector grades NEW commits against profile thresholds, not historical totals. Do NOT retrofit-test all existing code — test new code as you go.",
+  "version": "1.0",
+  "router_version": "1.8.0"
+}

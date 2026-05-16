@@ -1,0 +1,493 @@
+{
+  "info": {
+    "name": "Neuracode CRM",
+    "_postman_id": "neuracode-crm-collection-v1",
+    "description": "API completa Neuracode CRM — .NET 10 Minimal API en :5000.\n\nImportar también el environment `neuracode-crm.postman_environment.json`.\n\nFlujo de prueba WhatsApp:\n1. Ejecutar **POST Inbound — nuevo contacto** → guarda `wa_contact_id` automáticamente\n2. Ejecutar **POST Inbound — mismo wamid (dedup)** → debe devolver `received:true` sin duplicar\n3. Ejecutar **POST Inbound — segundo mensaje** → agrega actividad al mismo contacto\n4. Ejecutar **POST Send template** → 503 si `META_ACCESS_TOKEN` no configurado (esperado en local)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "{{base_url}}" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET /healthz",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/healthz", "host": ["{{base_url}}"], "path": ["healthz"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('status ok', () => {",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.status).to.eql('ok');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Contacts",
+      "item": [
+        {
+          "name": "GET /contacts",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/contacts",
+              "host": ["{{base_url}}"],
+              "path": ["api", "contacts"],
+              "query": [
+                { "key": "search", "value": "", "disabled": true },
+                { "key": "source", "value": "whatsapp", "disabled": true },
+                { "key": "temperature", "value": "hot", "disabled": true }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /contacts?source=whatsapp",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/contacts?source=whatsapp",
+              "host": ["{{base_url}}"],
+              "path": ["api", "contacts"],
+              "query": [{ "key": "source", "value": "whatsapp" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const contacts = pm.response.json();",
+                  "pm.test('all whatsapp source', () => {",
+                  "  contacts.forEach(c => pm.expect(c.source).to.eql('whatsapp'));",
+                  "});",
+                  "if (contacts.length > 0) {",
+                  "  pm.environment.set('wa_contact_id', contacts[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /contacts",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/contacts", "host": ["{{base_url}}"], "path": ["api", "contacts"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Juan Pérez\",\n  \"email\": \"juan@ejemplo.com\",\n  \"phone\": \"+51987654321\",\n  \"company\": \"ACME\",\n  \"source\": \"web\",\n  \"temperature\": \"warm\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const c = pm.response.json();",
+                  "pm.environment.set('contact_id', c.id);",
+                  "pm.test('has id', () => pm.expect(c.id).to.be.a('string'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /contacts/:id",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/contacts/{{contact_id}}", "host": ["{{base_url}}"], "path": ["api", "contacts", "{{contact_id}}"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('has waId field', () => {",
+                  "  const c = pm.response.json();",
+                  "  pm.expect(c).to.have.property('waId');",
+                  "  pm.expect(c).to.have.property('optedOut');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "WhatsApp — Webhook Verify",
+      "item": [
+        {
+          "name": "GET verify — token correcto ✓",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token={{meta_verify_token}}&hub.challenge=ECHO_CHALLENGE_123",
+              "host": ["{{base_url}}"],
+              "path": ["api", "webhooks", "whatsapp"],
+              "query": [
+                { "key": "hub.mode", "value": "subscribe" },
+                { "key": "hub.verify_token", "value": "{{meta_verify_token}}" },
+                { "key": "hub.challenge", "value": "ECHO_CHALLENGE_123" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('devuelve challenge exacto', () => {",
+                  "  pm.expect(pm.response.text()).to.eql('ECHO_CHALLENGE_123');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET verify — token incorrecto → 403",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=TOKEN_INCORRECTO&hub.challenge=X",
+              "host": ["{{base_url}}"],
+              "path": ["api", "webhooks", "whatsapp"],
+              "query": [
+                { "key": "hub.mode", "value": "subscribe" },
+                { "key": "hub.verify_token", "value": "TOKEN_INCORRECTO" },
+                { "key": "hub.challenge", "value": "X" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "WhatsApp — Inbound",
+      "item": [
+        {
+          "name": "POST inbound — nuevo contacto",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/webhooks/whatsapp", "host": ["{{base_url}}"], "path": ["api", "webhooks", "whatsapp"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"object\": \"whatsapp_business_account\",\n  \"entry\": [{\n    \"id\": \"1612237300105652\",\n    \"changes\": [{\n      \"value\": {\n        \"messaging_product\": \"whatsapp\",\n        \"metadata\": {\n          \"display_phone_number\": \"+51 997 055 975\",\n          \"phone_number_id\": \"1003010076238371\"\n        },\n        \"contacts\": [{\n          \"profile\": { \"name\": \"Juan Pérez\" },\n          \"wa_id\": \"51987654321\"\n        }],\n        \"messages\": [{\n          \"from\": \"51987654321\",\n          \"id\": \"wamid.HBgNNTQ5NzQ3MjQ5NzQ3DEMO001\",\n          \"timestamp\": \"1746820800\",\n          \"text\": { \"body\": \"Hola, quiero información sobre sus servicios\" },\n          \"type\": \"text\"\n        }]\n      },\n      \"field\": \"messages\"\n    }]\n  }]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('received true', () => {",
+                  "  pm.expect(pm.response.json().received).to.be.true;",
+                  "});",
+                  "// Guardar id del contacto creado",
+                  "const req = pm.sendRequest({",
+                  "  url: pm.environment.get('base_url') + '/api/contacts?source=whatsapp',",
+                  "  method: 'GET'",
+                  "}, (err, res) => {",
+                  "  const contacts = res.json();",
+                  "  if (contacts.length > 0) {",
+                  "    pm.environment.set('wa_contact_id', contacts[0].id);",
+                  "    console.log('wa_contact_id set:', contacts[0].id);",
+                  "  }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST inbound — mismo wamid (dedup) ✓",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/webhooks/whatsapp", "host": ["{{base_url}}"], "path": ["api", "webhooks", "whatsapp"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"object\": \"whatsapp_business_account\",\n  \"entry\": [{\n    \"id\": \"1612237300105652\",\n    \"changes\": [{\n      \"value\": {\n        \"messaging_product\": \"whatsapp\",\n        \"metadata\": {\n          \"display_phone_number\": \"+51 997 055 975\",\n          \"phone_number_id\": \"1003010076238371\"\n        },\n        \"contacts\": [{\n          \"profile\": { \"name\": \"Juan Pérez\" },\n          \"wa_id\": \"51987654321\"\n        }],\n        \"messages\": [{\n          \"from\": \"51987654321\",\n          \"id\": \"wamid.HBgNNTQ5NzQ3MjQ5NzQ3DEMO001\",\n          \"timestamp\": \"1746820800\",\n          \"text\": { \"body\": \"Hola, quiero información sobre sus servicios\" },\n          \"type\": \"text\"\n        }]\n      },\n      \"field\": \"messages\"\n    }]\n  }]\n}",
+              "description": "MISMO wamid que el request anterior — debe ignorarse (deduplicación)"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK (idempotente)', () => pm.response.to.have.status(200));",
+                  "pm.test('received true', () => pm.expect(pm.response.json().received).to.be.true);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST inbound — segundo mensaje (mismo wa_id)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/webhooks/whatsapp", "host": ["{{base_url}}"], "path": ["api", "webhooks", "whatsapp"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"object\": \"whatsapp_business_account\",\n  \"entry\": [{\n    \"id\": \"1612237300105652\",\n    \"changes\": [{\n      \"value\": {\n        \"messaging_product\": \"whatsapp\",\n        \"metadata\": {\n          \"display_phone_number\": \"+51 997 055 975\",\n          \"phone_number_id\": \"1003010076238371\"\n        },\n        \"contacts\": [{\n          \"profile\": { \"name\": \"Juan Pérez\" },\n          \"wa_id\": \"51987654321\"\n        }],\n        \"messages\": [{\n          \"from\": \"51987654321\",\n          \"id\": \"wamid.HBgNNTQ5NzQ3MjQ5NzQ3DEMO002\",\n          \"timestamp\": \"1746820900\",\n          \"text\": { \"body\": \"¿Me pueden dar más información del precio?\" },\n          \"type\": \"text\"\n        }]\n      },\n      \"field\": \"messages\"\n    }]\n  }]\n}",
+              "description": "wamid DISTINTO — mismo wa_id. Debe agregar actividad al contacto existente, no crear uno nuevo."
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST inbound — firma inválida → 403",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Hub-Signature-256", "value": "sha256=invalida0000000000000000000000000000000000000000000000000000000" }
+            ],
+            "url": { "raw": "{{base_url}}/api/webhooks/whatsapp", "host": ["{{base_url}}"], "path": ["api", "webhooks", "whatsapp"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"object\":\"whatsapp_business_account\",\"entry\":[]}",
+              "description": "Solo aplica si META_APP_SECRET está configurado. En local sin secret → 200 (validation skipped)."
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// 403 solo si META_APP_SECRET configurado; 200 si no (validation skipped en local)",
+                  "pm.test('403 o 200 según config', () => {",
+                  "  pm.expect([200, 403]).to.include(pm.response.code);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "WhatsApp — Send Template",
+      "item": [
+        {
+          "name": "POST send — crm_seguimiento",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/api/contacts/{{wa_contact_id}}/whatsapp/send",
+              "host": ["{{base_url}}"],
+              "path": ["api", "contacts", "{{wa_contact_id}}", "whatsapp", "send"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"templateName\": \"crm_seguimiento\",\n  \"languageCode\": \"es\",\n  \"parameters\": [\"Juan\", \"Agente\", \"Neuracode\", \"10/05/2026\"]\n}",
+              "description": "Requiere META_ACCESS_TOKEN configurado. Sin él → 503 (esperado en local).\nRequiere template 'crm_seguimiento' aprobado en Meta Business Manager."
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// 200 si META_ACCESS_TOKEN configurado y template aprobado",
+                  "// 503 si META_ACCESS_TOKEN no configurado (esperado en local)",
+                  "pm.test('200 o 503 según config', () => {",
+                  "  pm.expect([200, 503]).to.include(pm.response.code);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  pm.test('success true', () => pm.expect(pm.response.json().success).to.be.true);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST send — contacto sin wa_id → 400",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/api/contacts/{{contact_id}}/whatsapp/send",
+              "host": ["{{base_url}}"],
+              "path": ["api", "contacts", "{{contact_id}}", "whatsapp", "send"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"templateName\": \"crm_seguimiento\",\n  \"parameters\": [\"Juan\", \"Agente\", \"Neuracode\", \"10/05/2026\"]\n}",
+              "description": "{{contact_id}} = contacto creado sin wa_id (no llegó por WhatsApp). Debe devolver 400."
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('400 sin wa_id', () => pm.response.to.have.status(400));",
+                  "pm.test('error menciona wa_id', () => {",
+                  "  pm.expect(pm.response.json().error).to.include('wa_id');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST send — template vacío → 400",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/api/contacts/{{wa_contact_id}}/whatsapp/send",
+              "host": ["{{base_url}}"],
+              "path": ["api", "contacts", "{{wa_contact_id}}", "whatsapp", "send"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"templateName\": \"\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('400 template vacío', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST send — contacto no existe → 404",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/api/contacts/00000000-0000-0000-0000-000000000000/whatsapp/send",
+              "host": ["{{base_url}}"],
+              "path": ["api", "contacts", "00000000-0000-0000-0000-000000000000", "whatsapp", "send"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"templateName\": \"crm_seguimiento\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('404 no encontrado', () => pm.response.to.have.status(404));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Activities",
+      "item": [
+        {
+          "name": "GET /activities?contactId=:id",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/activities?contactId={{wa_contact_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "activities"],
+              "query": [{ "key": "contactId", "value": "{{wa_contact_id}}" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const acts = pm.response.json();",
+                  "pm.test('tiene actividades whatsapp_inbound', () => {",
+                  "  const wa = acts.filter(a => a.type === 'whatsapp_inbound');",
+                  "  pm.expect(wa.length).to.be.greaterThan(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

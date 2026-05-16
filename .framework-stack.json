@@ -1,0 +1,66 @@
+{
+  "project_name": "neuracode-crm",
+  "profile": "prod-saas",
+  "mode": "retrofit",
+  "router_version": "1.8.0",
+  "frameworks": {
+    "core": [
+      "SDD",
+      "TDD",
+      "Karpathy"
+    ],
+    "reinforce": [
+      "DDD",
+      "santa-loop",
+      "Tracer-bullet",
+      "ATDD",
+      "DocDD"
+    ],
+    "skip": [
+      "Vibe"
+    ]
+  },
+  "scaffold": {
+    "claude_md": true,
+    "docs_specs": true,
+    "evals": false,
+    "docs_adr": true,
+    "hooks": true
+  },
+  "skills": [
+    "prp-prd",
+    "prp-plan",
+    "prp-implement",
+    "tdd-workflow",
+    "santa-loop",
+    "code-review"
+  ],
+  "answers": {
+    "project_name": "neuracode-crm",
+    "criticidad": "prod-saas",
+    "output_ia": false,
+    "equipo": "solo",
+    "stakeholder_externo": true,
+    "dominio": "negocio-complejo",
+    "vida_util": "1-anio",
+    "integracion": "multi-sistema"
+  },
+  "stack_detected": {
+    "languages": [
+      "csharp",
+      "node"
+    ],
+    "test_runners": [
+      "jest",
+      "mocha",
+      "xunit"
+    ],
+    "frameworks": [
+      "aspnet-core",
+      "ef-core",
+      "next",
+      "react"
+    ],
+    "primary_language": "csharp"
+  }
+}

@@ -1,0 +1,687 @@
+openapi: 3.1.0
+info:
+  title: Neuracode CRM API
+  version: 1.0.0
+  description: |
+    Neuracode CRM API v1. .NET 10 Minimal API + Next.js 16 BFF.
+    Contract source-of-truth para agentes y integraciones.
+
+    Notas críticas (descubiertas Fase 0):
+    - IDs son TEXT (UUID v4), NO integer
+    - Timestamps SQLite: `integer` Unix segundos al serializar a JSON
+    - Schema sin auth (v1). Único caso: `/api/webhook` valida `x-webhook-secret` si está configurado en `crm_settings`
+    - Campo `temperature` (NO `status`) con valores `cold|warm|hot`
+  contact:
+    name: Neuracode
+    email: contacto@neuracode.dev
+    url: https://neuracode.dev
+servers:
+  - url: http://localhost:5000
+    description: .NET API local
+  - url: http://localhost:3000
+    description: Next.js BFF (proxy a .NET via proxy.ts)
+
+tags:
+  - name: contacts
+  - name: deals
+  - name: activities
+  - name: pipeline
+  - name: ai
+  - name: data
+  - name: integrations
+  - name: health
+
+paths:
+  /healthz:
+    get:
+      tags: [health]
+      summary: Liveness check (.NET only — no existe en Next.js)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+
+  /api/contacts:
+    get:
+      tags: [contacts]
+      summary: Listar contactos
+      parameters:
+        - { name: search, in: query, schema: { type: string }, description: Busca en name/email/company (LIKE %x%) }
+        - { name: temperature, in: query, schema: { type: string, enum: [cold, warm, hot] } }
+        - { name: source, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Lista (orden desc por createdAt)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Contact' }
+    post:
+      tags: [contacts]
+      summary: Crear contacto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContactCreate' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Contact' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/contacts/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [contacts]
+      summary: Detalle contacto + sus deals + sus activities
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContactDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [contacts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContactUpdate' }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Contact' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [contacts]
+      responses:
+        '200':
+          description: Eliminado (Next.js retorna `{success:true}`, NO 204)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/deals:
+    get:
+      tags: [deals]
+      summary: Listar deals con join contact + stage (campos planos)
+      responses:
+        '200':
+          description: Lista
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DealWithJoin' }
+    post:
+      tags: [deals]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DealCreate' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Deal' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/deals/{id}:
+    parameters: [ { name: id, in: path, required: true, schema: { type: string, format: uuid } } ]
+    get:
+      tags: [deals]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Deal' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [deals]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DealUpdate' }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Deal' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [deals]
+      responses:
+        '200':
+          description: Eliminado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { success: { type: boolean } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/activities:
+    get:
+      tags: [activities]
+      parameters:
+        - { name: contactId, in: query, schema: { type: string, format: uuid } }
+        - { name: dealId, in: query, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Lista (con join contactName)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ActivityWithContact' }
+    post:
+      tags: [activities]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ActivityCreate' }
+      responses:
+        '201':
+          description: Creada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Activity' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/activities/{id}:
+    parameters: [ { name: id, in: path, required: true, schema: { type: string, format: uuid } } ]
+    put:
+      tags: [activities]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ActivityUpdate' }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Activity' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [activities]
+      responses:
+        '200':
+          description: Eliminada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { success: { type: boolean } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/pipeline:
+    get:
+      tags: [pipeline]
+      summary: Pipeline completo (stages con deals embebidos)
+      responses:
+        '200':
+          description: Array de stages, cada uno con `deals[]`
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PipelineStageWithDeals' }
+    put:
+      tags: [pipeline]
+      summary: Mover deal entre etapas (drag&drop) O bulk replace stages
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/PipelineMoveDeal'
+                - $ref: '#/components/schemas/PipelineBulkStages'
+      responses:
+        '200':
+          description: Si move → deal actualizado. Si bulk → array de stages.
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/classify:
+    post:
+      tags: [ai]
+      summary: Clasificar lead (AI si ANTHROPIC_API_KEY, sino reglas)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contactId]
+              properties:
+                contactId: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Clasificación + actualiza contact (temperature, score)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClassifyResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/followups:
+    get:
+      tags: [activities]
+      summary: Activities pendientes (completedAt NULL) categorizadas
+      responses:
+        '200':
+          description: Buckets temporales
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FollowupsBuckets' }
+
+  /api/import:
+    post:
+      tags: [data]
+      summary: Importar bulk de contactos (JSON array, NO multipart)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contacts]
+              properties:
+                contacts:
+                  type: array
+                  items: { $ref: '#/components/schemas/ContactCreate' }
+      responses:
+        '201':
+          description: Todos importados OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportResult' }
+        '207':
+          description: Multi-status (algunos fallaron)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/export:
+    get:
+      tags: [data]
+      parameters: [ { name: type, in: query, required: true, schema: { type: string, enum: [contacts, deals] } } ]
+      responses:
+        '200':
+          description: CSV con BOM UTF-8
+          content:
+            text/csv:
+              schema: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/digest:
+    post:
+      tags: [integrations]
+      summary: Enviar digest email diario (requiere RESEND_API_KEY + DIGEST_EMAIL)
+      responses:
+        '200':
+          description: Email enviado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DigestResult' }
+        '400':
+          description: Config faltante
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+                  instructions: { type: array, items: { type: string } }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+  /api/webhook:
+    post:
+      tags: [integrations]
+      summary: Recibir lead externo (Typeform, Tally, custom)
+      description: |
+        Acepta cualquier JSON y mapea fields comunes (name/nombre, email/correo, etc.).
+        Si `crm_settings.webhook_secret` está set, requiere header `x-webhook-secret`.
+      parameters:
+        - { name: x-webhook-secret, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: Payload arbitrario (Typeform usa `{data:{...}}`)
+      responses:
+        '201':
+          description: Lead creado + activity log
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  contact:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      name: { type: string }
+                      email: { type: string, nullable: true }
+                      source: { type: string }
+        '400':
+          description: Falta nombre o JSON invalido
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+                  received: { type: array, items: { type: string } }
+                  hint: { type: string }
+        '401':
+          description: Secret invalido/faltante
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+components:
+  schemas:
+    Contact:
+      type: object
+      required: [id, name, source, temperature, score, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string, format: email, nullable: true }
+        phone: { type: string, nullable: true }
+        company: { type: string, nullable: true }
+        source: { type: string, default: otro }
+        temperature: { type: string, enum: [cold, warm, hot] }
+        score: { type: integer, minimum: 0, maximum: 100 }
+        notes: { type: string, nullable: true }
+        createdAt: { type: integer, description: Unix epoch seconds }
+        updatedAt: { type: integer, description: Unix epoch seconds }
+
+    ContactCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1 }
+        email: { type: string, format: email, nullable: true }
+        phone: { type: string, nullable: true }
+        company: { type: string, nullable: true }
+        source: { type: string, default: otro }
+        temperature: { type: string, enum: [cold, warm, hot], default: cold }
+        score: { type: integer, minimum: 0, maximum: 100, default: 0 }
+        notes: { type: string, nullable: true }
+
+    ContactUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        email: { type: string, format: email, nullable: true }
+        phone: { type: string, nullable: true }
+        company: { type: string, nullable: true }
+        source: { type: string }
+        temperature: { type: string, enum: [cold, warm, hot] }
+        score: { type: integer, minimum: 0, maximum: 100 }
+        notes: { type: string, nullable: true }
+
+    ContactDetail:
+      allOf:
+        - $ref: '#/components/schemas/Contact'
+        - type: object
+          properties:
+            deals:
+              type: array
+              items: { $ref: '#/components/schemas/Deal' }
+            activities:
+              type: array
+              items: { $ref: '#/components/schemas/Activity' }
+
+    Deal:
+      type: object
+      required: [id, title, value, stageId, contactId, probability, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        value: { type: integer, description: Centavos }
+        stageId: { type: string, format: uuid }
+        contactId: { type: string, format: uuid }
+        expectedClose: { type: integer, nullable: true, description: Unix epoch seconds }
+        probability: { type: integer, minimum: 0, maximum: 100 }
+        notes: { type: string, nullable: true }
+        createdAt: { type: integer }
+        updatedAt: { type: integer }
+
+    DealWithJoin:
+      allOf:
+        - $ref: '#/components/schemas/Deal'
+        - type: object
+          properties:
+            contactName: { type: string, nullable: true }
+            contactEmail: { type: string, nullable: true }
+            contactTemperature: { type: string, nullable: true, enum: [cold, warm, hot] }
+            stageName: { type: string, nullable: true }
+            stageColor: { type: string, nullable: true }
+            stageOrder: { type: integer, nullable: true }
+            stageIsWon: { type: boolean, nullable: true }
+            stageIsLost: { type: boolean, nullable: true }
+
+    DealCreate:
+      type: object
+      required: [title, contactId]
+      properties:
+        title: { type: string, minLength: 1 }
+        value: { type: integer, default: 0, description: Centavos }
+        stageId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Si null, usa el primer stage por order
+        contactId: { type: string, format: uuid }
+        expectedClose: { type: string, format: date-time, nullable: true }
+        probability: { type: integer, minimum: 0, maximum: 100, default: 0 }
+        notes: { type: string, nullable: true }
+
+    DealUpdate:
+      type: object
+      properties:
+        title: { type: string }
+        value: { type: integer }
+        stageId: { type: string, format: uuid }
+        contactId: { type: string, format: uuid }
+        expectedClose: { type: string, format: date-time, nullable: true }
+        probability: { type: integer, minimum: 0, maximum: 100 }
+        notes: { type: string, nullable: true }
+
+    Activity:
+      type: object
+      required: [id, type, description, contactId, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        type:
+          type: string
+          enum: [call, email, meeting, note, follow_up]
+        description: { type: string }
+        contactId: { type: string, format: uuid }
+        dealId: { type: string, format: uuid, nullable: true }
+        scheduledAt: { type: integer, nullable: true, description: Unix epoch seconds }
+        completedAt: { type: integer, nullable: true, description: Unix epoch seconds }
+        createdAt: { type: integer }
+
+    ActivityWithContact:
+      allOf:
+        - $ref: '#/components/schemas/Activity'
+        - type: object
+          properties:
+            contactName: { type: string, nullable: true }
+
+    ActivityCreate:
+      type: object
+      required: [type, description, contactId]
+      properties:
+        type: { type: string, enum: [call, email, meeting, note, follow_up] }
+        description: { type: string, minLength: 1 }
+        contactId: { type: string, format: uuid }
+        dealId: { type: string, format: uuid, nullable: true }
+        scheduledAt: { type: string, format: date-time, nullable: true }
+
+    ActivityUpdate:
+      type: object
+      description: |
+        completedAt acepta `true` o `null` → ahora; o ISO string → fecha.
+        Al menos un campo requerido.
+      properties:
+        description: { type: string, minLength: 1 }
+        scheduledAt:
+          oneOf:
+            - { type: string, format: date-time }
+            - { type: 'null' }
+        completedAt:
+          oneOf:
+            - { type: boolean }
+            - { type: 'null' }
+            - { type: string, format: date-time }
+
+    PipelineStage:
+      type: object
+      required: [id, name, order, color, isWon, isLost]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        order: { type: integer }
+        color: { type: string, default: '#64748b' }
+        isWon: { type: boolean, default: false }
+        isLost: { type: boolean, default: false }
+
+    PipelineStageWithDeals:
+      allOf:
+        - $ref: '#/components/schemas/PipelineStage'
+        - type: object
+          properties:
+            deals:
+              type: array
+              items:
+                allOf:
+                  - $ref: '#/components/schemas/Deal'
+                  - type: object
+                    properties:
+                      contactName: { type: string, nullable: true }
+                      contactTemperature: { type: string, nullable: true, enum: [cold, warm, hot] }
+
+    PipelineMoveDeal:
+      type: object
+      required: [dealId, stageId]
+      properties:
+        dealId: { type: string, format: uuid }
+        stageId: { type: string, format: uuid }
+
+    PipelineBulkStages:
+      type: object
+      required: [stages]
+      properties:
+        stages:
+          type: array
+          items:
+            type: object
+            required: [name, order]
+            properties:
+              name: { type: string }
+              order: { type: integer }
+              color: { type: string }
+              isWon: { type: boolean }
+              isLost: { type: boolean }
+
+    ClassifyResult:
+      type: object
+      required: [temperature, score, mode]
+      properties:
+        temperature: { type: string, enum: [cold, warm, hot] }
+        score: { type: integer, minimum: 0, maximum: 100 }
+        nextAction: { type: string, nullable: true }
+        reasoning: { type: string, nullable: true }
+        mode: { type: string, enum: [ai, rules] }
+
+    FollowupsBuckets:
+      type: object
+      required: [overdue, today, upcoming, unscheduled]
+      properties:
+        overdue: { type: array, items: { $ref: '#/components/schemas/FollowupItem' } }
+        today: { type: array, items: { $ref: '#/components/schemas/FollowupItem' } }
+        upcoming: { type: array, items: { $ref: '#/components/schemas/FollowupItem' } }
+        unscheduled: { type: array, items: { $ref: '#/components/schemas/FollowupItem' } }
+
+    FollowupItem:
+      allOf:
+        - $ref: '#/components/schemas/Activity'
+        - type: object
+          properties:
+            contactName: { type: string, nullable: true }
+            contactCompany: { type: string, nullable: true }
+
+    ImportResult:
+      type: object
+      required: [imported, failed, errors]
+      properties:
+        imported: { type: integer }
+        failed: { type: integer }
+        errors: { type: array, items: { type: string } }
+
+    DigestResult:
+      type: object
+      required: [success, emailId, sentTo, summary]
+      properties:
+        success: { type: boolean }
+        emailId: { type: string }
+        sentTo: { type: string }
+        summary:
+          type: object
+          properties:
+            overdue: { type: integer }
+            hotLeads: { type: integer }
+            activeDeals: { type: integer }
+            pipelineValue: { type: integer }
+
+    CrmSetting:
+      type: object
+      required: [key, value]
+      properties:
+        key: { type: string }
+        value: { type: string }
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+        details: { type: object, nullable: true }
+
+  responses:
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    BadRequest:
+      description: Request invalido
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ServerError:
+      description: Error interno
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }

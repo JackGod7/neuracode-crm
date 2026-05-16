@@ -1,0 +1,38 @@
+services:
+  crm-web:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+      - ./crm-config.json:/app/crm-config.json
+    environment:
+      - NODE_ENV=production
+      - NET_API_URL=http://crm-api:5000
+    restart: unless-stopped
+
+  crm-api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__DefaultConnection=Data Source=/app/data/crm.db
+      - META_PHONE_NUMBER_ID=${META_PHONE_NUMBER_ID}
+      - META_WABA_ID=${META_WABA_ID}
+      - META_ACCESS_TOKEN=${META_ACCESS_TOKEN}
+      - META_APP_SECRET=${META_APP_SECRET}
+      - META_VERIFY_TOKEN=${META_VERIFY_TOKEN}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AGENT_BUSINESS_PROMPT=${AGENT_BUSINESS_PROMPT}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
