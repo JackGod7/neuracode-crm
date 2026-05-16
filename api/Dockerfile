@@ -17,4 +17,4 @@ RUN dotnet publish "Neuracode.Crm.Api.csproj" -c Release -o /app/publish
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "Neuracode.Crm.Api.dll"]
+ENTRYPOINT ["sh", "-c", "dotnet Neuracode.Crm.Api.dll --urls http://+:${PORT:-5000}"]
