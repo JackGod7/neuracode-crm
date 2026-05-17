@@ -1,0 +1,19 @@
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+COPY ["api/src/Neuracode.Crm.Api/Neuracode.Crm.Api.csproj", "api/src/Neuracode.Crm.Api/"]
+RUN dotnet restore "api/src/Neuracode.Crm.Api/Neuracode.Crm.Api.csproj"
+COPY api/ api/
+WORKDIR "/src/api/src/Neuracode.Crm.Api"
+RUN dotnet build "Neuracode.Crm.Api.csproj" -c Release -o /app/build
+
+FROM build AS publish
+RUN dotnet publish "Neuracode.Crm.Api.csproj" -c Release -o /app/publish
+
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+ENTRYPOINT ["sh", "-c", "dotnet Neuracode.Crm.Api.dll --urls http://+:${PORT:-5000}"]
