@@ -40,6 +40,9 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.ScheduledAt).HasColumnName("scheduled_at");
             entity.Property(e => e.Type).HasColumnName("type");
 
+            entity.HasIndex(e => e.ContactId);
+            entity.HasIndex(e => e.DealId);
+
             entity.HasOne(d => d.Contact).WithMany(p => p.Activities)
                 .HasForeignKey(d => d.ContactId)
                 .OnDelete(DeleteBehavior.ClientSetNull);
@@ -97,6 +100,9 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at");
             entity.Property(e => e.Value).HasColumnName("value");
 
+            entity.HasIndex(e => e.ContactId);
+            entity.HasIndex(e => e.StageId);
+
             entity.HasOne(d => d.Contact).WithMany(p => p.Deals)
                 .HasForeignKey(d => d.ContactId)
                 .OnDelete(DeleteBehavior.ClientSetNull);
@@ -131,6 +137,7 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.Status).HasColumnName("status");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at");
             entity.HasIndex(e => e.Wamid).IsUnique();
+            entity.HasIndex(e => e.WaId);
         });
 
         OnModelCreatingPartial(modelBuilder);
