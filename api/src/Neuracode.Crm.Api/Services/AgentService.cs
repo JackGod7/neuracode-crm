@@ -20,7 +20,7 @@ public interface IAgentService
 public sealed class AgentService(IHttpClientFactory httpFactory, IConfiguration config) : IAgentService
 {
     private const string AnthropicUrl = "https://api.anthropic.com/v1/messages";
-    private const string Model = "claude-haiku-4-5-20251001";
+    private const string DefaultModel = "claude-haiku-4-5-20251001";
 
     public bool IsConfigured => !string.IsNullOrEmpty(config["ANTHROPIC_API_KEY"]);
 
@@ -31,6 +31,10 @@ public sealed class AgentService(IHttpClientFactory httpFactory, IConfiguration 
 
         try
         {
+            var model = config["AGENT_MODEL"] ?? DefaultModel;
+            var maxTokens = int.TryParse(config["AGENT_MAX_TOKENS"], out var mt) ? mt : 300;
+            var timeoutSeconds = int.TryParse(config["AGENT_TIMEOUT_SECONDS"], out var ts) ? ts : 3;
+
             var history = ctx.RecentMessages.Count > 0
                 ? "\n\nHistorial:\n" + string.Join("\n", ctx.RecentMessages.TakeLast(5))
                 : "";
@@ -39,14 +43,14 @@ public sealed class AgentService(IHttpClientFactory httpFactory, IConfiguration 
 
             var requestBody = new
             {
-                model = Model,
-                max_tokens = 300,
+                model,
+                max_tokens = maxTokens,
                 system = ctx.BusinessPrompt,
                 messages = new[] { new { role = "user", content = userContent } }
             };
 
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            cts.CancelAfter(TimeSpan.FromSeconds(3));
+            cts.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
 
             using var client = httpFactory.CreateClient();
             client.DefaultRequestHeaders.Add("x-api-key", apiKey);

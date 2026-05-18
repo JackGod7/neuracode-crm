@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Neuracode.Crm.Api.Data;
 using Neuracode.Crm.Api.Data.Entities;
+using Neuracode.Crm.Api.Domain;
 using Neuracode.Crm.Api.Services;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,13 +15,25 @@ public record WhatsAppSendRequest(string TemplateName, string? LanguageCode, str
 public static class WhatsAppEndpoints
 {
     const string DefaultBusinessPrompt =
-        "Eres el asistente de atención al cliente. Respondes en español, amable y conciso. " +
-        "Puedes informar sobre: horarios, métodos de pago, envíos a todo el país (2-3 días hábiles), " +
-        "política de devoluciones (7 días). " +
-        "Si el cliente pregunta precios específicos o quiere coordinar una compra, " +
-        "di que un asesor le contactará pronto. " +
-        "Si el cliente pide hablar con una persona, responde ÚNICAMENTE con la palabra: ESCALAR. " +
-        "Máximo 2 oraciones. Sin emojis.";
+        "Eres el asistente de ventas de Accesorios Para Él (accesoriosparael.store), " +
+        "tienda de joyería y accesorios en Perú. " +
+        "Respondes SOLO en español, sin emojis, con EXACTAMENTE 1 o 2 oraciones por respuesta. " +
+        "NUNCA escribas una tercera oración. Termina después de la segunda oración sin frases de cierre ni invitación.\n\n" +
+        "Productos disponibles:\n" +
+        "- Brazaletes/pulseras para caballero: METROPOLE, BOSS, E.ARMANI, CROCODILE\n" +
+        "- Brazaletes/pulseras para dama: ANGEL EYES\n" +
+        "- Combos para parejas: Combos Love (brazalete caballero + pulsera dama)\n" +
+        "- Precios: S/. 149–607, hasta 63% de descuento\n\n" +
+        "Política de la tienda:\n" +
+        "- Envíos: todo Perú + internacional; 2-3 días hábiles a provincias\n" +
+        "- Pagos: Yape, Plin, transferencia bancaria, tarjeta de crédito/débito, contra entrega\n" +
+        "- Separados: depósito mínimo S/. 40 confirma la compra\n" +
+        "- Cambios: hasta 15 días calendario desde la compra\n" +
+        "- Atención: todos los días de 9am a 7pm\n\n" +
+        "Si el cliente dice 'quiero hablar con alguien', 'quiero un asesor', o similar → " +
+        "responde ESCALAR (solo esa palabra, nada más).\n\n" +
+        "Si la pregunta está fuera de tu alcance (productos no disponibles, temas técnicos, " +
+        "preguntas no relacionadas) → redirecciona amablemente a los productos disponibles.";
 
     static readonly ConcurrentDictionary<string, SemaphoreSlim> _contactLocks = new();
 
@@ -122,7 +135,7 @@ public static class WhatsAppEndpoints
                         db.Activities.Add(new Activity
                         {
                             Id = Guid.NewGuid().ToString(),
-                            Type = "whatsapp_inbound",
+                            Type = ActivityTypes.WhatsAppInbound,
                             Description = msgBody,
                             ContactId = contact.Id,
                             Wamid = wamid,
@@ -134,7 +147,7 @@ public static class WhatsAppEndpoints
                             Id = Guid.NewGuid().ToString(),
                             WaId = waId,
                             Wamid = wamid,
-                            Direction = "inbound",
+                            Direction = WaDirection.Inbound,
                             Body = msgBody,
                             Status = "received",
                             CreatedAt = now
@@ -166,7 +179,7 @@ public static class WhatsAppEndpoints
                                         db.Activities.Add(new Activity
                                         {
                                             Id = Guid.NewGuid().ToString(),
-                                            Type = "whatsapp_outbound",
+                                            Type = ActivityTypes.WhatsAppOutbound,
                                             Description = agentReply,
                                             ContactId = contact.Id,
                                             Wamid = replyWamid,
@@ -226,7 +239,7 @@ public static class WhatsAppEndpoints
         db.Activities.Add(new Activity
         {
             Id = Guid.NewGuid().ToString(),
-            Type = "whatsapp_outbound",
+            Type = ActivityTypes.WhatsAppOutbound,
             Description = $"Template enviado: {body.TemplateName}",
             ContactId = contact.Id,
             Wamid = messageId,
