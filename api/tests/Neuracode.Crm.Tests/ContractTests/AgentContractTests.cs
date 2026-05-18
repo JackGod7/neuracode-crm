@@ -28,6 +28,17 @@ file sealed class EscalatingAgentService : IAgentService
     public Task<string?> HandleAsync(AgentContext ctx, CancellationToken ct = default) => Task.FromResult<string?>(null);
 }
 
+// ── Fake WhatsApp service — always succeeds in tests ─────────────────────────
+
+file sealed class FakeWhatsAppService : IWhatsAppService
+{
+    public bool IsConfigured => true;
+    public Task<(bool Success, string? MessageId)> SendTextAsync(string toWaId, string text) =>
+        Task.FromResult<(bool, string?)>((true, "wamid.fake." + Guid.NewGuid().ToString("N")));
+    public Task<(bool Success, string? MessageId)> SendTemplateAsync(string toWaId, string templateName, string languageCode = "es", params string[] parameters) =>
+        Task.FromResult<(bool, string?)>((true, "wamid.fake." + Guid.NewGuid().ToString("N")));
+}
+
 // ── Factories ─────────────────────────────────────────────────────────────────
 
 public class RespondingAgentFactory : NeuracodeFactory
@@ -39,6 +50,8 @@ public class RespondingAgentFactory : NeuracodeFactory
         {
             services.RemoveAll<IAgentService>();
             services.AddSingleton<IAgentService, RespondingAgentService>();
+            services.RemoveAll<IWhatsAppService>();
+            services.AddSingleton<IWhatsAppService, FakeWhatsAppService>();
         });
     }
 }

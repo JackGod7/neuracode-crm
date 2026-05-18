@@ -13,7 +13,7 @@ builder.Services.AddDbContext<AppDbContext>(opts =>
 
 builder.Services.AddOpenApi();
 builder.Services.AddHttpClient();
-builder.Services.AddScoped<WhatsAppService>();
+builder.Services.AddScoped<IWhatsAppService, WhatsAppService>();
 builder.Services.AddScoped<IAgentService, AgentService>();
 
 var app = builder.Build();
@@ -44,6 +44,8 @@ await using (var scope = app.Services.CreateAsyncScope())
             status TEXT NOT NULL,
             created_at INTEGER NOT NULL
         )");
+    await db.Database.ExecuteSqlRawAsync(
+        "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_contacts_wa_id\" ON \"contacts\" (\"wa_id\") WHERE \"wa_id\" IS NOT NULL");
 }
 
 if (app.Environment.IsDevelopment())

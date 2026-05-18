@@ -4,7 +4,7 @@ using System.Text.Json;
 
 namespace Neuracode.Crm.Api.Services;
 
-public sealed class WhatsAppService(IHttpClientFactory httpFactory, IConfiguration config)
+public sealed class WhatsAppService(IHttpClientFactory httpFactory, IConfiguration config) : IWhatsAppService
 {
     private const string GraphUrl = "https://graph.facebook.com/v25.0";
 

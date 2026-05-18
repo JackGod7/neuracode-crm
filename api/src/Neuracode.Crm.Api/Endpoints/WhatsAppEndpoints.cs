@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -20,6 +21,8 @@ public static class WhatsAppEndpoints
         "di que un asesor le contactará pronto. " +
         "Si el cliente pide hablar con una persona, responde ÚNICAMENTE con la palabra: ESCALAR. " +
         "Máximo 2 oraciones. Sin emojis.";
+
+    static readonly ConcurrentDictionary<string, SemaphoreSlim> _contactLocks = new();
 
     public static IEndpointRouteBuilder MapWhatsAppEndpoints(this IEndpointRouteBuilder app)
     {
@@ -45,7 +48,7 @@ public static class WhatsAppEndpoints
 
     static async Task<IResult> HandleInbound(
         HttpRequest request, AppDbContext db, IConfiguration config,
-        IAgentService agentService, WhatsAppService whatsApp)
+        IAgentService agentService, IWhatsAppService whatsApp)
     {
         request.EnableBuffering();
         var rawBody = await new StreamReader(request.Body, Encoding.UTF8, leaveOpen: true).ReadToEndAsync();
@@ -88,86 +91,95 @@ public static class WhatsAppEndpoints
 
                     if (string.IsNullOrEmpty(wamid) || string.IsNullOrEmpty(waId)) continue;
 
-                    if (await db.WhatsAppMessages.AnyAsync(m => m.Wamid == wamid)) continue;
-
-                    var displayName = ResolveDisplayName(contactsEl, waId);
-
-                    var contact = await db.Contacts.FirstOrDefaultAsync(c => c.WaId == waId);
-                    if (contact is null)
+                    var sem = _contactLocks.GetOrAdd(waId, _ => new SemaphoreSlim(1, 1));
+                    await sem.WaitAsync();
+                    try
                     {
-                        contact = new Contact
+                        if (await db.WhatsAppMessages.AnyAsync(m => m.Wamid == wamid)) continue;
+
+                        var displayName = ResolveDisplayName(contactsEl, waId);
+
+                        var contact = await db.Contacts.FirstOrDefaultAsync(c => c.WaId == waId);
+                        if (contact is null)
+                        {
+                            contact = new Contact
+                            {
+                                Id = Guid.NewGuid().ToString(),
+                                Name = displayName,
+                                Phone = "+" + waId,
+                                WaId = waId,
+                                Source = "whatsapp",
+                                Temperature = "hot",
+                                BotHandling = true,
+                                Score = 0,
+                                CreatedAt = now,
+                                UpdatedAt = now
+                            };
+                            db.Contacts.Add(contact);
+                            await db.SaveChangesAsync();
+                        }
+
+                        db.Activities.Add(new Activity
                         {
                             Id = Guid.NewGuid().ToString(),
-                            Name = displayName,
-                            Phone = "+" + waId,
-                            WaId = waId,
-                            Source = "whatsapp",
-                            Temperature = "hot",
-                            BotHandling = true,
-                            Score = 0,
-                            CreatedAt = now,
-                            UpdatedAt = now
-                        };
-                        db.Contacts.Add(contact);
-                        await db.SaveChangesAsync();
-                    }
+                            Type = "whatsapp_inbound",
+                            Description = msgBody,
+                            ContactId = contact.Id,
+                            Wamid = wamid,
+                            CreatedAt = now
+                        });
 
-                    db.Activities.Add(new Activity
-                    {
-                        Id = Guid.NewGuid().ToString(),
-                        Type = "whatsapp_inbound",
-                        Description = msgBody,
-                        ContactId = contact.Id,
-                        Wamid = wamid,
-                        CreatedAt = now
-                    });
-
-                    db.WhatsAppMessages.Add(new WhatsAppMessage
-                    {
-                        Id = Guid.NewGuid().ToString(),
-                        WaId = waId,
-                        Wamid = wamid,
-                        Direction = "inbound",
-                        Body = msgBody,
-                        Status = "received",
-                        CreatedAt = now
-                    });
-
-                    await db.SaveChangesAsync();
-
-                    // Agent hook — never propagates exceptions, bounded by 3s timeout
-                    if (contact.BotHandling && agentService.IsConfigured)
-                    {
-                        try
+                        db.WhatsAppMessages.Add(new WhatsAppMessage
                         {
-                            var recentMsgs = await db.Activities
-                                .Where(a => a.ContactId == contact.Id && a.Type!.StartsWith("whatsapp"))
-                                .OrderByDescending(a => a.CreatedAt)
-                                .Take(5)
-                                .Select(a => (a.Type == "whatsapp_inbound" ? "Cliente" : "Bot") + ": " + a.Description)
-                                .ToListAsync();
+                            Id = Guid.NewGuid().ToString(),
+                            WaId = waId,
+                            Wamid = wamid,
+                            Direction = "inbound",
+                            Body = msgBody,
+                            Status = "received",
+                            CreatedAt = now
+                        });
 
-                            var businessPrompt = config["AGENT_BUSINESS_PROMPT"] ?? DefaultBusinessPrompt;
-                            var ctx = new AgentContext(contact.Id, waId, displayName, msgBody, recentMsgs, businessPrompt);
-                            var agentReply = await agentService.HandleAsync(ctx);
+                        await db.SaveChangesAsync();
 
-                            if (agentReply is not null)
+                        // Agent hook — never propagates exceptions, bounded by 3s timeout
+                        if (contact.BotHandling && agentService.IsConfigured && !contact.OptedOut)
+                        {
+                            try
                             {
-                                var (_, replyWamid) = await whatsApp.SendTextAsync(waId, agentReply);
-                                db.Activities.Add(new Activity
+                                var recentMsgs = await db.Activities
+                                    .Where(a => a.ContactId == contact.Id && a.Type!.StartsWith("whatsapp"))
+                                    .OrderByDescending(a => a.CreatedAt)
+                                    .Take(5)
+                                    .Select(a => (a.Type == "whatsapp_inbound" ? "Cliente" : "Bot") + ": " + a.Description)
+                                    .ToListAsync();
+
+                                var businessPrompt = config["AGENT_BUSINESS_PROMPT"] ?? DefaultBusinessPrompt;
+                                var ctx = new AgentContext(contact.Id, waId, displayName, msgBody, recentMsgs, businessPrompt);
+                                var agentReply = await agentService.HandleAsync(ctx);
+
+                                if (agentReply is not null)
                                 {
-                                    Id = Guid.NewGuid().ToString(),
-                                    Type = "whatsapp_outbound",
-                                    Description = agentReply,
-                                    ContactId = contact.Id,
-                                    Wamid = replyWamid,
-                                    CreatedAt = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds()
-                                });
-                                await db.SaveChangesAsync();
+                                    var (sendSuccess, replyWamid) = await whatsApp.SendTextAsync(waId, agentReply);
+                                    if (sendSuccess)
+                                    {
+                                        db.Activities.Add(new Activity
+                                        {
+                                            Id = Guid.NewGuid().ToString(),
+                                            Type = "whatsapp_outbound",
+                                            Description = agentReply,
+                                            ContactId = contact.Id,
+                                            Wamid = replyWamid,
+                                            CreatedAt = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+                                        });
+                                        await db.SaveChangesAsync();
+                                    }
+                                }
                             }
+                            catch { /* agent must never break webhook */ }
                         }
-                        catch { /* agent must never break webhook */ }
                     }
+                    finally { sem.Release(); }
                 }
             }
         }
@@ -179,7 +191,7 @@ public static class WhatsAppEndpoints
         string id,
         WhatsAppSendRequest body,
         AppDbContext db,
-        WhatsAppService whatsApp)
+        IWhatsAppService whatsApp)
     {
         if (string.IsNullOrWhiteSpace(body.TemplateName))
             return Results.BadRequest(new { error = "templateName es requerido" });

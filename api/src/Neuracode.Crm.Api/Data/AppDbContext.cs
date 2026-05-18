@@ -69,6 +69,7 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.OptedOut).HasColumnName("opted_out").HasDefaultValue(false);
             entity.Property(e => e.BotHandling).HasColumnName("bot_handling").HasDefaultValue(false);
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at");
+            entity.HasIndex(e => e.WaId).IsUnique().HasFilter("wa_id IS NOT NULL");
         });
 
         modelBuilder.Entity<CrmSetting>(entity =>
