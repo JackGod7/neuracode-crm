@@ -52,6 +52,7 @@ public static class WhatsAppEndpoints
         app.MapGet("/api/webhooks/whatsapp", VerifyWebhook).WithTags("whatsapp");
         app.MapPost("/api/webhooks/whatsapp", HandleInbound).WithTags("whatsapp");
         app.MapPost("/api/contacts/{id}/whatsapp/send", SendTemplate).WithTags("whatsapp");
+        app.MapGet("/api/contacts/{id}/chat", Chat).WithTags("whatsapp");
         app.MapPost("/api/contacts/{id}/handoff", Handoff).WithTags("whatsapp");
         app.MapPost("/api/contacts/{id}/bot-resume", BotResume).WithTags("whatsapp");
         return app;
@@ -326,6 +327,18 @@ public static class WhatsAppEndpoints
         await db.SaveChangesAsync();
 
         return Results.Ok(new { success = true, messageId });
+    }
+
+    static async Task<IResult> Chat(string id, AppDbContext db)
+    {
+        var contact = await db.Contacts.FindAsync(id);
+        if (contact is null) return Results.NotFound();
+        var msgs = await db.Activities
+            .Where(a => a.ContactId == id && a.Type!.StartsWith("whatsapp"))
+            .OrderBy(a => a.CreatedAt)
+            .Select(a => new { dir = a.Type == "whatsapp_inbound" ? "in" : "out", msg = a.Description, ts = a.CreatedAt })
+            .ToListAsync();
+        return Results.Ok(msgs);
     }
 
     static async Task<IResult> Handoff(string id, AppDbContext db)
