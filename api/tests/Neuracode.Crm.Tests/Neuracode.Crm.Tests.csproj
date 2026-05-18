@@ -24,4 +24,10 @@
     <ProjectReference Include="..\..\src\Neuracode.Crm.Api\Neuracode.Crm.Api.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="EvalTests\scenarios\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

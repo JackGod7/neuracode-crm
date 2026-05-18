@@ -1,0 +1,68 @@
+{
+  "scenarios": [
+    {
+      "name": "catalogo_basico",
+      "description": "Cliente nuevo pregunta qué tienen — debe listar colecciones sin deflectar",
+      "turns": [
+        { "messages": ["¿Qué pulseras y brazaletes tienen?"], "name": "María" }
+      ],
+      "expected": { "minNaturalidad": 3, "minPrecision": 4, "deflectionForbidden": true }
+    },
+    {
+      "name": "presupuesto_150",
+      "description": "Cliente con S/. 150 — debe indicar qué puede comprar, no derivar a asesor",
+      "turns": [
+        { "messages": ["Tengo 150 soles, ¿qué me recomiendas?"], "name": "Carlos" }
+      ],
+      "expected": { "minNaturalidad": 3, "minPrecision": 4, "deflectionForbidden": true }
+    },
+    {
+      "name": "regalo_enamorada_cumpleanos",
+      "description": "Cliente busca regalo para su pareja — debe sugerir Combos Love naturalmente",
+      "turns": [
+        { "messages": ["Busco algo para regalar a mi enamorada por su cumpleaños, tiene 25 años"], "name": "Luis" }
+      ],
+      "expected": { "minNaturalidad": 3, "minPrecision": 4, "deflectionForbidden": true }
+    },
+    {
+      "name": "fuera_catalogo_anillos",
+      "description": "Cliente pregunta por anillos — debe aclarar que no venden y redirigir",
+      "turns": [
+        { "messages": ["¿Tienen anillos de plata?"], "name": "Rosa" }
+      ],
+      "expected": { "minNaturalidad": 3, "minPrecision": 4, "deflectionForbidden": false }
+    },
+    {
+      "name": "politica_devoluciones",
+      "description": "Cliente pregunta si puede devolver — debe mencionar 15 días sin deflectar",
+      "turns": [
+        { "messages": ["Si no me gusta puedo devolverlo?"], "name": "Pedro" }
+      ],
+      "expected": { "minNaturalidad": 3, "minPrecision": 4, "deflectionForbidden": true }
+    },
+    {
+      "name": "metodos_pago",
+      "description": "Cliente pregunta formas de pago — debe mencionar al menos 2 métodos",
+      "turns": [
+        { "messages": ["¿Cómo puedo pagar?"], "name": "Ana" }
+      ],
+      "expected": { "minNaturalidad": 3, "minPrecision": 4, "deflectionForbidden": true }
+    },
+    {
+      "name": "precio_coleccion_boss",
+      "description": "Cliente pregunta precio del BOSS — debe dar precio/rango, no derivar",
+      "turns": [
+        { "messages": ["¿Cuánto cuesta el BOSS?"], "name": "Diego" }
+      ],
+      "expected": { "minNaturalidad": 3, "minPrecision": 4, "deflectionForbidden": true }
+    },
+    {
+      "name": "fragmentos_incoherentes",
+      "description": "Mensajes cortos y fragmentados — agente debe responder algo útil sin crashear",
+      "turns": [
+        { "messages": ["Si", "eso que dijiste", "muéstrame más"], "name": "Juan" }
+      ],
+      "expected": { "minNaturalidad": 2, "minPrecision": 2, "deflectionForbidden": false }
+    }
+  ]
+}
