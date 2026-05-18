@@ -46,6 +46,17 @@ await using (var scope = app.Services.CreateAsyncScope())
         )");
     await db.Database.ExecuteSqlRawAsync(
         "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_contacts_wa_id\" ON \"contacts\" (\"wa_id\") WHERE \"wa_id\" IS NOT NULL");
+
+    // FK indexes — absent in existing installs, critical for query performance
+    foreach (var idx in new[]
+    {
+        "CREATE INDEX IF NOT EXISTS \"IX_activities_contact_id\" ON \"activities\" (\"contact_id\")",
+        "CREATE INDEX IF NOT EXISTS \"IX_activities_deal_id\" ON \"activities\" (\"deal_id\") WHERE \"deal_id\" IS NOT NULL",
+        "CREATE INDEX IF NOT EXISTS \"IX_deals_contact_id\" ON \"deals\" (\"contact_id\")",
+        "CREATE INDEX IF NOT EXISTS \"IX_deals_stage_id\" ON \"deals\" (\"stage_id\")",
+        "CREATE INDEX IF NOT EXISTS \"IX_whatsapp_messages_wa_id\" ON \"whatsapp_messages\" (\"wa_id\")",
+    })
+        await db.Database.ExecuteSqlRawAsync(idx);
 }
 
 if (app.Environment.IsDevelopment())
