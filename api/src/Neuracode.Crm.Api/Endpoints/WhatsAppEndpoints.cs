@@ -61,7 +61,8 @@ public static class WhatsAppEndpoints
 
     static async Task<IResult> HandleInbound(
         HttpRequest request, AppDbContext db, IConfiguration config,
-        IAgentService agentService, IWhatsAppService whatsApp)
+        IAgentService agentService, IWhatsAppService whatsApp,
+        ILoggerFactory loggerFactory)
     {
         request.EnableBuffering();
         var rawBody = await new StreamReader(request.Body, Encoding.UTF8, leaveOpen: true).ReadToEndAsync();
@@ -103,6 +104,10 @@ public static class WhatsAppEndpoints
                         : "";
 
                     if (string.IsNullOrEmpty(wamid) || string.IsNullOrEmpty(waId)) continue;
+
+                    var logger = loggerFactory.CreateLogger("WhatsApp");
+                    var correlationId = request.HttpContext.TraceIdentifier;
+                    using var scope = logger.BeginScope(new { correlationId, waId });
 
                     var sem = _contactLocks.GetOrAdd(waId, _ => new SemaphoreSlim(1, 1));
                     await sem.WaitAsync();
@@ -189,7 +194,10 @@ public static class WhatsAppEndpoints
                                     }
                                 }
                             }
-                            catch { /* agent must never break webhook */ }
+                            catch (Exception ex)
+                            {
+                                logger.LogWarning(ex, "Agent pipeline error for waId {WaId}", waId);
+                            }
                         }
                     }
                     finally { sem.Release(); }
