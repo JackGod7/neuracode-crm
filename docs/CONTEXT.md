@@ -86,23 +86,31 @@ Intake (webhook / import / manual)
 
 ### En progreso
 
-- [ ] WhatsApp Business API — `docs/specs/whatsapp-meta/spec.md`
-  - [x] Backend: webhook inbound + outbound send + DB schema + 11 tests (2026-05-10)
-  - [ ] UI: botón "Enviar WhatsApp" + historial en detalle de contacto
-  - [ ] Producción: registrar webhook URL en Meta for Developers
-  - [ ] Templates en español: crear en Meta Business Manager (aprobación 24-48h)
-- [ ] Track 2 HIPAA stack bootstrap (ADR-0007)
+- [ ] WhatsApp AI agent — L2 memoria conversacional (`docs/specs/whatsapp-agent/roadmap.md`)
+  - [ ] Tabla `agent_memory` (waId, key, value, updated_at)
+  - [ ] Extracción JSON post-turn (segundo LLM call)
+  - [ ] Inyectar contexto en prompt
+- [ ] Templates WhatsApp en español: crear en Meta Business Manager (aprobación 24-48h)
 - [ ] GHL reseller SOPs — `docs/track1-ghl/`
 
 ### Pendiente
 
+- [ ] WhatsApp UI: botón "Enviar" + historial en detalle de contacto (frontend, sprint futuro)
+- [ ] Track 2 HIPAA stack bootstrap (ADR-0007)
 - [ ] Retell AI voice integration (ADR-0006)
 - [ ] SQLCipher swap para Track 2
 - [ ] BAA chain documentation (Retell → Neuracode → cliente)
 - [ ] Lead deduplication en import path
 - [ ] Source validation en ImportEndpoints
-- [ ] v2 API extensions (`docs/sdd/01-api-extensions-v2.md`)
 - [ ] `next update` a 16.2.4 (security patch mayo 2026)
+
+### Deuda técnica conocida
+
+- [ ] Semaphore leak: `ConcurrentDictionary<string, SemaphoreSlim>` crece sin bound — implementar LRU/TTL eviction
+- [ ] Split transaction en `WhatsAppEndpoints.cs`: contact creado sin activities si segundo `SaveChanges` falla — wrappear en transacción
+- [ ] Magic strings: `AgentSignals` / `WaDirection` constants incompletos — extraer todos los string literals
+- [ ] `WhatsAppEndpoints.cs` 310 líneas, God handler (SRP violation) — extraer `InboundMessageHandler` + `ContactResolver`
+- [ ] `UnitTest1.cs` — dead code, eliminar
 
 ### Completado
 
@@ -112,3 +120,9 @@ Intake (webhook / import / manual)
 - [x] LeadSource — catálogo canónico + whatsapp source
 - [x] N+1 fix en bulk import
 - [x] Dual-track strategy (ADR-0005)
+- [x] WhatsApp Business API backend (webhook inbound + outbound + DB schema + 139 tests) (2026-05-18)
+- [x] WhatsApp agent jewelry store prompt — "Accesorios Para Él" en producción Railway (2026-05-18)
+- [x] BUG-02: prompt clarifica productos fuera de catálogo (anillos, etc.) (2026-05-18)
+- [x] FK indexes: activities.contact_id, activities.deal_id, deals.contact_id, deals.stage_id, whatsapp_messages.wa_id (2026-05-18)
+- [x] Structured logging + correlation IDs para WhatsApp pipeline (2026-05-18)
+- [x] Mutex por waId + UNIQUE index contacts.wa_id (BUG-01 concurrencia) (2026-05-18)

@@ -24,6 +24,8 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<WhatsAppMessage> WhatsAppMessages { get; set; }
 
+    public virtual DbSet<AgentMemory> AgentMemories { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Activity>(entity =>
@@ -138,6 +140,15 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.CreatedAt).HasColumnName("created_at");
             entity.HasIndex(e => e.Wamid).IsUnique();
             entity.HasIndex(e => e.WaId);
+        });
+
+        modelBuilder.Entity<AgentMemory>(entity =>
+        {
+            entity.ToTable("agent_memory");
+            entity.HasKey(e => e.WaId);
+            entity.Property(e => e.WaId).HasColumnName("wa_id");
+            entity.Property(e => e.Data).HasColumnName("data");
+            entity.Property(e => e.UpdatedAt).HasColumnName("updated_at");
         });
 
         OnModelCreatingPartial(modelBuilder);

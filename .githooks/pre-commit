@@ -1,0 +1,14 @@
+#!/bin/sh
+# Pre-commit: run full dotnet test suite
+pwsh -NonInteractive -Command "
+\$ErrorActionPreference = 'Stop'
+Write-Host 'Running full dotnet test suite...' -ForegroundColor Cyan
+\$start = Get-Date
+dotnet test api/tests/Neuracode.Crm.Tests/Neuracode.Crm.Tests.csproj --nologo --verbosity quiet
+if (\$LASTEXITCODE -ne 0) {
+    Write-Host 'BLOCKED: tests failing. Fix before commit. Use --no-verify only in emergencies.' -ForegroundColor Red
+    exit 1
+}
+\$elapsed = [int]((Get-Date) - \$start).TotalSeconds
+Write-Host \"Tests passed in \${elapsed}s\" -ForegroundColor Green
+"

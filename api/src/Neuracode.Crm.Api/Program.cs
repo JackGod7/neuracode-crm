@@ -15,6 +15,8 @@ builder.Services.AddOpenApi();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<IWhatsAppService, WhatsAppService>();
 builder.Services.AddScoped<IAgentService, AgentService>();
+builder.Services.AddScoped<IAgentMemoryRepository, AgentMemoryRepository>();
+builder.Services.AddScoped<IMemoryExtractorService, MemoryExtractorService>();
 
 var app = builder.Build();
 
@@ -46,6 +48,13 @@ await using (var scope = app.Services.CreateAsyncScope())
         )");
     await db.Database.ExecuteSqlRawAsync(
         "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_contacts_wa_id\" ON \"contacts\" (\"wa_id\") WHERE \"wa_id\" IS NOT NULL");
+
+    await db.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS agent_memory (
+            wa_id TEXT NOT NULL PRIMARY KEY,
+            data TEXT NOT NULL DEFAULT '{{}}',
+            updated_at INTEGER NOT NULL
+        )");
 
     // FK indexes — absent in existing installs, critical for query performance
     foreach (var idx in new[]

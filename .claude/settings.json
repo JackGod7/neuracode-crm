@@ -1,4 +1,7 @@
 {
+  "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": [
+    "team-1"
+  ],
   "permissions": {
     "allow": [
       "Bash(npm run dev:*)",
