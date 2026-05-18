@@ -87,7 +87,7 @@ Número WA: +51 997 055 975 | Modelo: Claude Haiku 4.5
 
 | ID | Descripción | Prioridad | Fix sugerido |
 |----|-------------|-----------|--------------|
-| BUG-01 | Msgs simultáneos → solo 1 outbound | Alta | Mutex por contactId en HandleInbound |
+| BUG-01 | Msgs simultáneos → contacto duplicado + pérdida de inbounds | Alta | **Cerrado** — mutex por waId + UNIQUE index on `contacts.wa_id` + `IWhatsAppService` (2026-05-18) |
 | BUG-02 | No aclara productos fuera de catálogo (ej: anillos) | Media | Agregar al prompt lista de lo que NO se vende |
 | BUG-03 | Respuestas V1 genéricas sin identidad de marca | Cerrado | Resuelto con PROMPT V2 |
 

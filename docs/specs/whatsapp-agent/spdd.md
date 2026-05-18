@@ -1,6 +1,6 @@
 # WhatsApp AI Agent — SPDD
 
-**Status**: spec | **Date**: 2026-05-17 | **Owner**: Jack Aguilar | **Track**: both
+**Status**: implemented | **Date**: 2026-05-18 | **Owner**: Jack Aguilar | **Track**: both
 **Format**: Fowler SPDD REASONS canvas (martinfowler.com/articles/structured-prompt-driven/)
 
 ---
@@ -200,8 +200,8 @@ POSTCONDITION: Activity inbound guardada; NO outbound; webhook retorna 200
 | S1 | Nunca enviar respuesta después de handoff | Guard `contact.BotHandling` evaluado DESPUÉS de cargar contacto desde DB, no desde caché |
 | S2 | Nunca procesar wamid duplicado | `WhatsAppMessage.wamid` columna UNIQUE + check antes de toda lógica de negocio |
 | S3 | Nunca propagar excepción desde `AgentService` | try/catch total en `HandleAsync`; log + return null |
-| S4 | Nunca enviar a contacto con `opted_out = true` | Guard explícito antes de llamar agente Y antes de `SendTextAsync` |
+| S4 | Nunca enviar a contacto con `opted_out = true` | Guard explícito antes de llamar agente Y antes de `SendTextAsync` ✅ fixed 2026-05-18 |
 | S5 | Nunca enviar mensaje fuera de ventana 24 h | `WhatsAppService.SendTextAsync` solo disponible en ventana de sesión; templates para fuera de ventana (fuera de scope de este sprint) |
 | S6 | Nunca hardcodear API key | Leer de `IConfiguration["ANTHROPIC_API_KEY"]`; si null → `IsConfigured = false` |
 | S7 | Nunca loguear el body completo del mensaje en Track 2 | `RedactPhi(message)` antes del log |
-| S8 | Nunca crear Activity outbound sin un send exitoso | El orden es: send → si ok → insertar Activity. Si send falla, no registrar outbound falsa. |
+| S8 | Nunca crear Activity outbound sin un send exitoso | El orden es: send → si ok → insertar Activity. Si send falla, no registrar outbound falsa. ✅ fixed 2026-05-18 |
