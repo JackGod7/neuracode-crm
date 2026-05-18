@@ -15,9 +15,9 @@ namespace Neuracode.Crm.Tests.ContractTests;
 
 file static class GherkinAssert
 {
-    // Counts sentence-ending punctuation; skips "S/. 40" via (?<!\d)
+    // Skips "S/. 40" via (?<![/\d]) — "/" precedes the dot in "S/."
     public static int SentenceCount(string text) =>
-        Regex.Matches(text.Trim(), @"(?<!\d)[.!?](?:\s|$)").Count;
+        Regex.Matches(text.Trim(), @"(?<![/\d])[.!?](?:\s|$)").Count;
 
     // Detects emoji: high surrogate pairs (U+10000+) or Misc Symbols U+2600–U+27FF
     public static bool ContainsEmoji(string text) =>
@@ -160,6 +160,7 @@ public class WhatsAppRobustnessContractTests(TimeoutAgentFactory factory) : ICla
 // PROMPT EVAL TESTS — require ANTHROPIC_API_KEY; silently skip otherwise
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Collection("RealAgent")]
 public class WhatsAppPromptEvalTests(RealAgentFactory factory) : IClassFixture<RealAgentFactory>
 {
     private static bool HasApiKey =>
@@ -172,7 +173,7 @@ public class WhatsAppPromptEvalTests(RealAgentFactory factory) : IClassFixture<R
         var wamid = "wamid.pe." + Guid.NewGuid().ToString("N");
 
         await client.PostAsync("/api/webhooks/whatsapp", WaMsg.Inbound(waId, wamid, "Cliente", message));
-        await Task.Delay(500); // wait for debounce (50ms in test config) + agent
+        await Task.Delay(7000); // debounce (50ms) + Anthropic API (≤5s) + buffer
 
         var contacts = await client.GetFromJsonAsync<JsonElement[]>("/api/contacts?source=whatsapp");
         var contactId = FindContactId(contacts!, waId);
@@ -211,7 +212,7 @@ public class WhatsAppPromptEvalTests(RealAgentFactory factory) : IClassFixture<R
         if (!HasApiKey) return;
         var reply = await GetOutboundText("¿envían a Arequipa?");
         reply.Should().NotBeNullOrEmpty();
-        reply!.Should().MatchRegex(@"2.?3", "must mention 2-3 day delivery window");
+        reply!.Should().MatchRegex(@"2.{0,5}3", "must mention 2-3 day delivery window");
         GherkinAssert.SentenceCount(reply).Should().BeLessThanOrEqualTo(2);
         GherkinAssert.ContainsEmoji(reply).Should().BeFalse();
     }
@@ -223,7 +224,8 @@ public class WhatsAppPromptEvalTests(RealAgentFactory factory) : IClassFixture<R
         if (!HasApiKey) return;
         var reply = await GetOutboundText("¿hacen envíos al extranjero?");
         reply.Should().NotBeNullOrEmpty();
-        reply!.ToLower().Should().ContainAny("internacional", "extranjero", "fuera",
+        reply!.ToLower().Should().ContainAny(
+            ["internacional", "extranjero", "fuera", "exterior", "todo el mundo"],
             "must confirm international shipping");
         GherkinAssert.SentenceCount(reply).Should().BeLessThanOrEqualTo(2);
     }

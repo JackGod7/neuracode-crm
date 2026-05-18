@@ -8,6 +8,7 @@ namespace Neuracode.Crm.Tests.EvalTests;
 
 // Uses RealAgentFactory (defined in WhatsAppGherkinTests.cs) — real Anthropic API + CapturingWhatsAppService
 
+[Collection("RealAgent")]
 public class PromptEvalTests(RealAgentFactory factory) : IClassFixture<RealAgentFactory>
 {
     private static readonly string? ApiKey =

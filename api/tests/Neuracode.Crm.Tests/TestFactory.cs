@@ -10,6 +10,10 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Neuracode.Crm.Tests;
 
+// Serializes all classes that use the real Anthropic API so they don't race each other
+[CollectionDefinition("RealAgent")]
+public class RealAgentCollection { }
+
 public class NeuracodeFactory : WebApplicationFactory<Program>
 {
     private readonly SqliteConnection _connection;

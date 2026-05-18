@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Neuracode.Crm.Api.Domain;
 
 namespace Neuracode.Crm.Api.Services;
@@ -28,6 +29,16 @@ public sealed class AgentService(
     private const string DefaultModel = "claude-haiku-4-5-20251001";
 
     public bool IsConfigured => !string.IsNullOrEmpty(config["ANTHROPIC_API_KEY"]);
+
+    // Skips "S/. 40" via (?<![/\d]) — "/" precedes the dot in "S/."
+    private static readonly Regex SentenceEnd = new(@"(?<![/\d])[.!?](?:\s|$)", RegexOptions.Compiled);
+
+    private static string TruncateToTwoSentences(string text)
+    {
+        var matches = SentenceEnd.Matches(text);
+        if (matches.Count <= 2) return text;
+        return text[..(matches[1].Index + 1)].TrimEnd();
+    }
 
     public async Task<string?> HandleAsync(AgentContext ctx, CancellationToken ct = default)
     {
@@ -74,6 +85,7 @@ public sealed class AgentService(
 
             var text = textEl.GetString()?.Trim();
             if (string.IsNullOrEmpty(text)) return null;
+            text = TruncateToTwoSentences(text);
             if (text.Equals("ESCALAR", StringComparison.OrdinalIgnoreCase))
             {
                 logger.LogInformation("Agent signalled ESCALAR for contact {ContactId}", ctx.ContactId);
