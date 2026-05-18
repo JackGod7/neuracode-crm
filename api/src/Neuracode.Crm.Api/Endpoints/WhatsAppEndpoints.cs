@@ -65,6 +65,7 @@ public static class WhatsAppEndpoints
     static async Task<IResult> HandleInbound(
         HttpRequest request, AppDbContext db, IConfiguration config,
         IAgentService agentService, IWhatsAppService whatsApp,
+        IAgentMemoryRepository memoryRepo, IServiceScopeFactory scopeFactory,
         ILoggerFactory loggerFactory)
     {
         request.EnableBuffering();
@@ -175,8 +176,9 @@ public static class WhatsAppEndpoints
                                     .Select(a => (a.Type == "whatsapp_inbound" ? "Cliente" : "Bot") + ": " + a.Description)
                                     .ToListAsync();
 
+                                var memory = await memoryRepo.GetAsync(waId);
                                 var businessPrompt = config["AGENT_BUSINESS_PROMPT"] ?? DefaultBusinessPrompt;
-                                var ctx = new AgentContext(contact.Id, waId, displayName, msgBody, recentMsgs, businessPrompt);
+                                var ctx = new AgentContext(contact.Id, waId, displayName, msgBody, recentMsgs, businessPrompt, memory);
                                 var agentReply = await agentService.HandleAsync(ctx);
 
                                 if (agentReply is not null)
@@ -194,6 +196,29 @@ public static class WhatsAppEndpoints
                                             CreatedAt = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds()
                                         });
                                         await db.SaveChangesAsync();
+
+                                        // Fire-and-forget memory extraction (2s timeout, never blocks response)
+                                        var capturedWaId = waId;
+                                        var capturedMsg = msgBody;
+                                        var capturedReply = agentReply;
+                                        var capturedMemory = memory;
+                                        _ = Task.Run(async () =>
+                                        {
+                                            try
+                                            {
+                                                using var scope = scopeFactory.CreateScope();
+                                                var extractor = scope.ServiceProvider.GetRequiredService<IMemoryExtractorService>();
+                                                var repo = scope.ServiceProvider.GetRequiredService<IAgentMemoryRepository>();
+                                                using var cts2 = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                                                var extracted = await extractor.ExtractAsync(capturedMsg, capturedReply, capturedMemory, cts2.Token);
+                                                if (extracted is not null)
+                                                    await repo.UpsertAsync(capturedWaId, capturedMemory.MergeWith(extracted), cts2.Token);
+                                            }
+                                            catch (Exception ex)
+                                            {
+                                                logger.LogWarning(ex, "Memory extraction failed for waId {WaId}", capturedWaId);
+                                            }
+                                        });
                                     }
                                 }
                             }

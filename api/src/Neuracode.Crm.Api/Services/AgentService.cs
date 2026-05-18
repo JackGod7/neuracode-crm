@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using Neuracode.Crm.Api.Domain;
 
 namespace Neuracode.Crm.Api.Services;
 
@@ -9,7 +10,8 @@ public record AgentContext(
     string Name,
     string Message,
     IReadOnlyList<string> RecentMessages,
-    string BusinessPrompt);
+    string BusinessPrompt,
+    AgentMemoryData? Memory = null);
 
 public interface IAgentService
 {
@@ -38,11 +40,15 @@ public sealed class AgentService(
             var maxTokens = int.TryParse(config["AGENT_MAX_TOKENS"], out var mt) ? mt : 300;
             var timeoutSeconds = int.TryParse(config["AGENT_TIMEOUT_SECONDS"], out var ts) ? ts : 3;
 
+            var memory = ctx.Memory is { IsEmpty: false }
+                ? $"\n\nMemoria del cliente:\n{ctx.Memory.ToPromptString()}"
+                : "";
+
             var history = ctx.RecentMessages.Count > 0
                 ? "\n\nHistorial:\n" + string.Join("\n", ctx.RecentMessages.TakeLast(5))
                 : "";
 
-            var userContent = $"{history}\n\nMensaje de {ctx.Name}: {ctx.Message}";
+            var userContent = $"{memory}{history}\n\nMensaje de {ctx.Name}: {ctx.Message}";
 
             var requestBody = new
             {
