@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Neuracode.Crm.Api.Data;
 using Neuracode.Crm.Api.Data.Entities;
+using Neuracode.Crm.Api.Domain;
 using Neuracode.Crm.Api.Services;
 using Microsoft.EntityFrameworkCore;
 
@@ -134,7 +135,7 @@ public static class WhatsAppEndpoints
                         db.Activities.Add(new Activity
                         {
                             Id = Guid.NewGuid().ToString(),
-                            Type = "whatsapp_inbound",
+                            Type = ActivityTypes.WhatsAppInbound,
                             Description = msgBody,
                             ContactId = contact.Id,
                             Wamid = wamid,
@@ -146,7 +147,7 @@ public static class WhatsAppEndpoints
                             Id = Guid.NewGuid().ToString(),
                             WaId = waId,
                             Wamid = wamid,
-                            Direction = "inbound",
+                            Direction = WaDirection.Inbound,
                             Body = msgBody,
                             Status = "received",
                             CreatedAt = now
@@ -178,7 +179,7 @@ public static class WhatsAppEndpoints
                                         db.Activities.Add(new Activity
                                         {
                                             Id = Guid.NewGuid().ToString(),
-                                            Type = "whatsapp_outbound",
+                                            Type = ActivityTypes.WhatsAppOutbound,
                                             Description = agentReply,
                                             ContactId = contact.Id,
                                             Wamid = replyWamid,
@@ -238,7 +239,7 @@ public static class WhatsAppEndpoints
         db.Activities.Add(new Activity
         {
             Id = Guid.NewGuid().ToString(),
-            Type = "whatsapp_outbound",
+            Type = ActivityTypes.WhatsAppOutbound,
             Description = $"Template enviado: {body.TemplateName}",
             ContactId = contact.Id,
             Wamid = messageId,
