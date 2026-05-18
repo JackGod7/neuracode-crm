@@ -17,7 +17,10 @@ public interface IAgentService
     Task<string?> HandleAsync(AgentContext ctx, CancellationToken ct = default);
 }
 
-public sealed class AgentService(IHttpClientFactory httpFactory, IConfiguration config) : IAgentService
+public sealed class AgentService(
+    IHttpClientFactory httpFactory,
+    IConfiguration config,
+    ILogger<AgentService> logger) : IAgentService
 {
     private const string AnthropicUrl = "https://api.anthropic.com/v1/messages";
     private const string DefaultModel = "claude-haiku-4-5-20251001";
@@ -64,13 +67,23 @@ public sealed class AgentService(IHttpClientFactory httpFactory, IConfiguration 
             if (!content[0].TryGetProperty("text", out var textEl)) return null;
 
             var text = textEl.GetString()?.Trim();
-            if (string.IsNullOrEmpty(text) || text.Equals("ESCALAR", StringComparison.OrdinalIgnoreCase))
+            if (string.IsNullOrEmpty(text)) return null;
+            if (text.Equals("ESCALAR", StringComparison.OrdinalIgnoreCase))
+            {
+                logger.LogInformation("Agent signalled ESCALAR for contact {ContactId}", ctx.ContactId);
                 return null;
+            }
 
             return text;
         }
-        catch
+        catch (OperationCanceledException)
         {
+            logger.LogWarning("Agent timeout for contact {ContactId}", ctx.ContactId);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Agent error for contact {ContactId}", ctx.ContactId);
             return null;
         }
     }
