@@ -1,6 +1,6 @@
 # Track 2 — Voice + HIPAA + Multi-Channel API
 
-**Status**: Draft (TDD pending) | **Date**: 2026-05-03 | **Owner**: Jack Aguilar | **Track**: T2
+**Status**: Draft (migrate to REASONS canvas before implementing) | **Date**: 2026-05-03 | **Owner**: Jack Aguilar | **Track**: T2
 
 ---
 

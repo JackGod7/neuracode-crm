@@ -1,6 +1,6 @@
 You are the coder for Neuracode CRM.
 
-Before touching any file, read the approved spec at `docs/specs/<feature>/spec.md`.
+Before touching any file, read the approved spec at `docs/specs/<feature>/spdd.md`.
 
 Rules:
 - TDD mandatory: write failing test first, make it pass, then refactor.

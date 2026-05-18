@@ -1,49 +1,88 @@
 # [Feature Name]
 
-**Status**: Draft | Approved | Superseded  
+**Status**: Draft | Approved | Implemented | Superseded
 **Date**: YYYY-MM-DD | **Owner**: [nombre] | **Track**: T1 | T2 | both
 
 ---
 
-## Motivación
+## Requirements — qué debe hacer el sistema
 
-Por qué existe este problema. Qué dolor resuelve. Quién lo siente.
-Una sola vez — no repetir en Mecánica.
-
----
-
-## Mecánica
-
-Cómo funciona la solución. Decisiones tomadas. Invariantes numerados y testeables.
-
-1. Invariante 1 (verificable en test)
-2. Invariante 2
+1. Invariante testeable 1
+2. Invariante testeable 2
 3. ...
 
 **Out of scope:** qué NO entra en este spec (explícito).
 
 ---
 
-## Ejemplos
+## Entities — objetos de dominio
 
-Input/output concretos. Payloads reales. Estos ejemplos se convierten en contract tests.
+| Entidad | Campos clave | Notas |
+|---------|-------------|-------|
+| `Entity` | field1, field2 | ... |
+
+---
+
+## Approach — cómo funciona
 
 ```
-Input:  { ... }
-Output: { ... }
+Actor
+  │
+  ▼
+Step 1 — breve descripción
+  ├─ 1a. sub-paso
+  └─ 1b. sub-paso
+  │
+  ▼
+Step 2
 ```
 
 ---
 
-## Consecuencias
+## Structure — árbol de archivos
 
-- Qué cambia en el sistema
-- Trade-offs aceptados
-- Deuda técnica que introduce (si aplica)
+```
+api/src/Neuracode.Crm.Api/
+├── Endpoints/FeatureEndpoints.cs
+├── Services/IFeatureService.cs
+└── Data/Entities/FeatureEntity.cs
+
+api/tests/Neuracode.Crm.Tests/
+├── ContractTests/FeatureContractTests.cs
+└── UnitTests/FeatureUnitTests.cs
+```
+
+---
+
+## Operations — operaciones clave
+
+### O1 — Nombre operación (happy path)
+```
+PRECONDITION : condición inicial
+INPUT        : descripción del input
+OUTPUT       : descripción del output
+POSTCONDITION: estado final garantizado
+```
+
+---
+
+## Norms — restricciones
+
+| # | Norma | Justificación |
+|---|-------|--------------|
+| N1 | ... | ... |
+
+---
+
+## Safeguards — qué nunca debe ocurrir
+
+| # | Safeguard | Mecanismo |
+|---|-----------|-----------|
+| S1 | Nunca ... | ... |
 
 ---
 
 ## Patrones relacionados
 
 - `docs/adr/XXXX-nombre.md`
-- `docs/specs/feature-relacionada/spec.md`
+- `docs/specs/feature-relacionada/spdd.md`
