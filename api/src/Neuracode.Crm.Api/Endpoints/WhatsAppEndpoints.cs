@@ -14,6 +14,12 @@ public record WhatsAppSendRequest(string TemplateName, string? LanguageCode, str
 
 public static class WhatsAppEndpoints
 {
+    private sealed class DebounceState
+    {
+        public readonly List<string> Messages = [];
+        public CancellationTokenSource Cts = new();
+    }
+
     const string DefaultBusinessPrompt =
         "Eres el asistente de ventas de Accesorios Para Él (accesoriosparael.store), " +
         "tienda de joyería y accesorios en Perú. " +
@@ -39,6 +45,7 @@ public static class WhatsAppEndpoints
         "→ redirecciona amablemente a los productos disponibles.";
 
     static readonly ConcurrentDictionary<string, SemaphoreSlim> _contactLocks = new();
+    static readonly ConcurrentDictionary<string, DebounceState> _debounce = new();
 
     public static IEndpointRouteBuilder MapWhatsAppEndpoints(this IEndpointRouteBuilder app)
     {
@@ -164,68 +171,103 @@ public static class WhatsAppEndpoints
 
                         await db.SaveChangesAsync();
 
-                        // Agent hook — never propagates exceptions, bounded by 3s timeout
-                        if (contact.BotHandling && agentService.IsConfigured && !contact.OptedOut)
+                        // Debounce: buffer message, fire agent after inactivity window
+                        if (contact.BotHandling && agentService.IsConfigured && !contact.OptedOut
+                            && !string.IsNullOrEmpty(msgBody))
                         {
-                            try
+                            var debounceMs = int.TryParse(config["AGENT_DEBOUNCE_MS"], out var dm) ? dm : 4000;
+                            var state = _debounce.GetOrAdd(waId, _ => new DebounceState());
+                            CancellationTokenSource newCts;
+                            lock (state)
                             {
-                                var recentMsgs = await db.Activities
-                                    .Where(a => a.ContactId == contact.Id && a.Type!.StartsWith("whatsapp"))
-                                    .OrderByDescending(a => a.CreatedAt)
-                                    .Take(5)
-                                    .Select(a => (a.Type == "whatsapp_inbound" ? "Cliente" : "Bot") + ": " + a.Description)
-                                    .ToListAsync();
+                                state.Messages.Add(msgBody);
+                                state.Cts.Cancel();
+                                state.Cts.Dispose();
+                                state.Cts = newCts = new CancellationTokenSource();
+                            }
 
-                                var memory = await memoryRepo.GetAsync(waId);
-                                var businessPrompt = config["AGENT_BUSINESS_PROMPT"] ?? DefaultBusinessPrompt;
-                                var ctx = new AgentContext(contact.Id, waId, displayName, msgBody, recentMsgs, businessPrompt, memory);
-                                var agentReply = await agentService.HandleAsync(ctx);
+                            var capturedWaId = waId;
+                            var capturedDisplayName = displayName;
+                            var capturedConfig = config;
+                            var capturedFactory = scopeFactory;
+                            var capturedLogger = logger;
+                            _ = Task.Run(async () =>
+                            {
+                                try { await Task.Delay(debounceMs, newCts.Token); }
+                                catch (OperationCanceledException) { return; }
 
-                                if (agentReply is not null)
+                                List<string> msgs;
+                                lock (state) { msgs = [.. state.Messages]; state.Messages.Clear(); }
+                                if (msgs.Count == 0) return;
+                                var combined = string.Join(" ", msgs);
+
+                                try
                                 {
-                                    var (sendSuccess, replyWamid) = await whatsApp.SendTextAsync(waId, agentReply);
-                                    if (sendSuccess)
-                                    {
-                                        db.Activities.Add(new Activity
-                                        {
-                                            Id = Guid.NewGuid().ToString(),
-                                            Type = ActivityTypes.WhatsAppOutbound,
-                                            Description = agentReply,
-                                            ContactId = contact.Id,
-                                            Wamid = replyWamid,
-                                            CreatedAt = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds()
-                                        });
-                                        await db.SaveChangesAsync();
+                                    using var agentScope = capturedFactory.CreateScope();
+                                    var sp = agentScope.ServiceProvider;
+                                    var scopedDb = sp.GetRequiredService<AppDbContext>();
+                                    var scopedAgent = sp.GetRequiredService<IAgentService>();
+                                    var scopedWhatsApp = sp.GetRequiredService<IWhatsAppService>();
+                                    var scopedMemoryRepo = sp.GetRequiredService<IAgentMemoryRepository>();
 
-                                        // Fire-and-forget memory extraction (2s timeout, never blocks response)
-                                        var capturedWaId = waId;
-                                        var capturedMsg = msgBody;
-                                        var capturedReply = agentReply;
-                                        var capturedMemory = memory;
-                                        _ = Task.Run(async () =>
+                                    var freshContact = await scopedDb.Contacts.FirstOrDefaultAsync(c => c.WaId == capturedWaId);
+                                    if (freshContact is null || !freshContact.BotHandling || freshContact.OptedOut) return;
+
+                                    var recentMsgs = await scopedDb.Activities
+                                        .Where(a => a.ContactId == freshContact.Id && a.Type!.StartsWith("whatsapp"))
+                                        .OrderByDescending(a => a.CreatedAt)
+                                        .Take(10)
+                                        .Select(a => (a.Type == "whatsapp_inbound" ? "Cliente" : "Bot") + ": " + a.Description)
+                                        .ToListAsync();
+
+                                    var memory = await scopedMemoryRepo.GetAsync(capturedWaId);
+                                    var businessPrompt = capturedConfig["AGENT_BUSINESS_PROMPT"] ?? DefaultBusinessPrompt;
+                                    var ctx = new AgentContext(freshContact.Id, capturedWaId, capturedDisplayName, combined, recentMsgs, businessPrompt, memory);
+                                    var agentReply = await scopedAgent.HandleAsync(ctx);
+
+                                    if (agentReply is null) return;
+
+                                    var (sendSuccess, replyWamid) = await scopedWhatsApp.SendTextAsync(capturedWaId, agentReply);
+                                    if (!sendSuccess) return;
+
+                                    var now2 = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                                    scopedDb.Activities.Add(new Activity
+                                    {
+                                        Id = Guid.NewGuid().ToString(),
+                                        Type = ActivityTypes.WhatsAppOutbound,
+                                        Description = agentReply,
+                                        ContactId = freshContact.Id,
+                                        Wamid = replyWamid,
+                                        CreatedAt = now2
+                                    });
+                                    await scopedDb.SaveChangesAsync();
+
+                                    var capturedMsg = combined;
+                                    var capturedReply = agentReply;
+                                    var capturedMemory = memory;
+                                    _ = Task.Run(async () =>
+                                    {
+                                        try
                                         {
-                                            try
-                                            {
-                                                using var scope = scopeFactory.CreateScope();
-                                                var extractor = scope.ServiceProvider.GetRequiredService<IMemoryExtractorService>();
-                                                var repo = scope.ServiceProvider.GetRequiredService<IAgentMemoryRepository>();
-                                                using var cts2 = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-                                                var extracted = await extractor.ExtractAsync(capturedMsg, capturedReply, capturedMemory, cts2.Token);
-                                                if (extracted is not null)
-                                                    await repo.UpsertAsync(capturedWaId, capturedMemory.MergeWith(extracted), cts2.Token);
-                                            }
-                                            catch (Exception ex)
-                                            {
-                                                logger.LogWarning(ex, "Memory extraction failed for waId {WaId}", capturedWaId);
-                                            }
-                                        });
-                                    }
+                                            using var extractScope = capturedFactory.CreateScope();
+                                            var extractor = extractScope.ServiceProvider.GetRequiredService<IMemoryExtractorService>();
+                                            var repo = extractScope.ServiceProvider.GetRequiredService<IAgentMemoryRepository>();
+                                            using var cts2 = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                                            var extracted = await extractor.ExtractAsync(capturedMsg, capturedReply, capturedMemory, cts2.Token);
+                                            if (extracted is not null)
+                                                await repo.UpsertAsync(capturedWaId, capturedMemory.MergeWith(extracted), cts2.Token);
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            capturedLogger.LogWarning(ex, "Memory extraction failed for waId {WaId}", capturedWaId);
+                                        }
+                                    });
                                 }
-                            }
-                            catch (Exception ex)
-                            {
-                                logger.LogWarning(ex, "Agent pipeline error for waId {WaId}", waId);
-                            }
+                                catch (Exception ex)
+                                {
+                                    capturedLogger.LogWarning(ex, "Debounced agent pipeline error for waId {WaId}", capturedWaId);
+                                }
+                            }, CancellationToken.None);
                         }
                     }
                     finally { sem.Release(); }

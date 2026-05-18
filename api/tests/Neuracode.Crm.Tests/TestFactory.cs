@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -28,6 +29,8 @@ public class NeuracodeFactory : WebApplicationFactory<Program>
                 opts.UseSqlite(_connection));
             services.AddTransient<IStartupFilter, DbSchemaInitFilter>();
         });
+        builder.ConfigureAppConfiguration((_, cfg) =>
+            cfg.AddInMemoryCollection(new Dictionary<string, string?> { ["AGENT_DEBOUNCE_MS"] = "50" }));
     }
 
     public async Task SeedAsync(Func<AppDbContext, Task> seed)

@@ -172,6 +172,7 @@ public class WhatsAppPromptEvalTests(RealAgentFactory factory) : IClassFixture<R
         var wamid = "wamid.pe." + Guid.NewGuid().ToString("N");
 
         await client.PostAsync("/api/webhooks/whatsapp", WaMsg.Inbound(waId, wamid, "Cliente", message));
+        await Task.Delay(500); // wait for debounce (50ms in test config) + agent
 
         var contacts = await client.GetFromJsonAsync<JsonElement[]>("/api/contacts?source=whatsapp");
         var contactId = FindContactId(contacts!, waId);

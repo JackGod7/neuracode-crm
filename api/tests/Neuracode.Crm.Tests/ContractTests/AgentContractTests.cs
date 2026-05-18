@@ -191,6 +191,7 @@ public class AgentRespondingContractTests(RespondingAgentFactory factory) : ICla
         var wamid = "wamid.agent." + Guid.NewGuid().ToString("N");
 
         await client.PostAsync("/api/webhooks/whatsapp", WaPayload.Inbound(waId, wamid, "Cliente", "¿hacen envíos?"));
+        await Task.Delay(300); // wait for debounce (50ms in test config) + agent
 
         var contacts = await client.GetFromJsonAsync<JsonElement[]>("/api/contacts?source=whatsapp");
         var contact = contacts!.First(c => c.TryGetProperty("waId", out var w) && w.GetString() == waId);
@@ -209,6 +210,8 @@ public class AgentRespondingContractTests(RespondingAgentFactory factory) : ICla
         var wamid1 = "wamid.hof1." + Guid.NewGuid().ToString("N");
 
         await client.PostAsync("/api/webhooks/whatsapp", WaPayload.Inbound(waId, wamid1, "Cliente", "Hola"));
+        await Task.Delay(300); // wait for debounce + agent for first message
+
         var contacts = await client.GetFromJsonAsync<JsonElement[]>("/api/contacts?source=whatsapp");
         var contactId = contacts!.First(c => c.TryGetProperty("waId", out var w) && w.GetString() == waId)
             .GetProperty("id").GetString()!;
@@ -220,6 +223,7 @@ public class AgentRespondingContractTests(RespondingAgentFactory factory) : ICla
 
         var wamid2 = "wamid.hof2." + Guid.NewGuid().ToString("N");
         await client.PostAsync("/api/webhooks/whatsapp", WaPayload.Inbound(waId, wamid2, "Cliente", "Sigo esperando"));
+        await Task.Delay(300); // wait for debounce to fire (BotHandling=false → no outbound)
 
         var actsAfter = await client.GetFromJsonAsync<JsonElement[]>($"/api/activities?contactId={contactId}");
         var outboundAfter = actsAfter!.Count(a => a.GetProperty("type").GetString() == "whatsapp_outbound");

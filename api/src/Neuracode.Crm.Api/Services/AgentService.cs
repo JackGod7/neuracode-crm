@@ -41,7 +41,7 @@ public sealed class AgentService(
             var timeoutSeconds = int.TryParse(config["AGENT_TIMEOUT_SECONDS"], out var ts) ? ts : 3;
 
             var memory = ctx.Memory is { IsEmpty: false }
-                ? $"\n\nMemoria del cliente:\n{ctx.Memory.ToPromptString()}"
+                ? $"\n\nMemoria del cliente (cliente recurrente — omite el saludo de bienvenida, ya se presentó antes):\n{ctx.Memory.ToPromptString()}"
                 : "";
 
             var history = ctx.RecentMessages.Count > 0

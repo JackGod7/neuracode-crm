@@ -150,6 +150,7 @@ public class AgentMemoryContractTests(AgentMemorySpyFactory factory) : IClassFix
 
         var resp = await client.PostAsync("/api/webhooks/whatsapp",
             MemWaPayload.Inbound(waId, wamid, "Cliente", "Hola"));
+        await Task.Delay(300);
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
         factory.SpyAgent.LastContext.Should().NotBeNull();
@@ -175,6 +176,7 @@ public class AgentMemoryContractTests(AgentMemorySpyFactory factory) : IClassFix
         var wamid2 = "wamid.mem2b." + Guid.NewGuid().ToString("N");
         await client.PostAsync("/api/webhooks/whatsapp",
             MemWaPayload.Inbound(waId, wamid2, "Cliente", "¿tienen el BOSS?"));
+        await Task.Delay(300);
 
         factory.SpyAgent.LastContext!.Memory.Should().NotBeNull();
         factory.SpyAgent.LastContext.Memory!.Name.Should().Be("Juan Extraido",
@@ -202,6 +204,7 @@ public class AgentMemoryContractTests(AgentMemorySpyFactory factory) : IClassFix
         var wamid = "wamid.seeded." + Guid.NewGuid().ToString("N");
         await client.PostAsync("/api/webhooks/whatsapp",
             MemWaPayload.Inbound(waId, wamid, "Maria", "Quiero el combo"));
+        await Task.Delay(300);
 
         factory.SpyAgent.LastContext!.Memory!.Name.Should().Be("Maria");
         factory.SpyAgent.LastContext.Memory.SalesState.Should().Be("considering");
