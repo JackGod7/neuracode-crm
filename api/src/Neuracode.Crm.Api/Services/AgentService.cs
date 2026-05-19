@@ -35,7 +35,7 @@ public sealed class AgentService(
         new
         {
             name = "get_product_price",
-            description = "Obtiene precio exacto y detalles de un producto del catálogo. USA ESTA TOOL para cualquier pregunta de precio de METROPOLE, BOSS, E.ARMANI, CROCODILE, ANGEL_EYES o COMBOS_LOVE.",
+            description = "Consulta precio y detalles de un producto. OBLIGATORIO cuando el cliente pregunta cuánto cuesta, el precio, o el valor de cualquier brazalete o pulsera. Llama esta tool ANTES de mencionar cualquier precio.",
             input_schema = new
             {
                 type = "object",
@@ -67,7 +67,7 @@ public sealed class AgentService(
         new
         {
             name = "answer_general",
-            description = "Responde preguntas de política de tienda (envíos, pagos, devoluciones, horario) o mensajes generales que no requieren consultar precio ni stock.",
+            description = "Responde preguntas de política (envíos, pagos, devoluciones, horario), saludos, preguntas fuera de catálogo, o escalación. NUNCA uses esta tool para responder precios o disponibilidad de productos — usa get_product_price o check_stock para eso.",
             input_schema = new
             {
                 type = "object",
