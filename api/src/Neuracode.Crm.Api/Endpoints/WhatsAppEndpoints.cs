@@ -32,7 +32,7 @@ public static class WhatsAppEndpoints
         "- Brazaletes/pulseras para caballero: METROPOLE, BOSS, E.ARMANI, CROCODILE\n" +
         "- Brazaletes/pulseras para dama: ANGEL EYES\n" +
         "- Combos para parejas: Combos Love (brazalete caballero + pulsera dama)\n" +
-        "- Precios: S/. 149–607, hasta 63% de descuento\n\n" +
+        "- Precios: usa get_product_price(sku) para precio exacto por colección (rango general S/. 149–607)\n\n" +
         "Política de la tienda:\n" +
         "- Envíos: todo Perú + internacional; 2-3 días hábiles a provincias\n" +
         "- Pagos: Yape, Plin, transferencia bancaria, tarjeta de crédito/débito, contra entrega\n" +
@@ -228,7 +228,9 @@ public static class WhatsAppEndpoints
 
                                     var memory = await scopedMemoryRepo.GetAsync(capturedWaId);
                                     var businessPrompt = capturedConfig["AGENT_BUSINESS_PROMPT"] ?? DefaultBusinessPrompt;
-                                    var ctx = new AgentContext(freshContact.Id, capturedWaId, capturedDisplayName, combined, recentMsgs, businessPrompt, memory);
+                                    var catalogJson = (await scopedDb.CrmSettings.FindAsync(ProductCatalog.SettingsKey))?.Value;
+                                    var catalog = catalogJson is not null ? ProductCatalog.Parse(catalogJson) : ProductCatalog.Default;
+                                    var ctx = new AgentContext(freshContact.Id, capturedWaId, capturedDisplayName, combined, recentMsgs, businessPrompt, memory, catalog);
                                     var agentReply = await scopedAgent.HandleAsync(ctx);
 
                                     if (agentReply is null) return;
