@@ -35,7 +35,7 @@ public sealed class AgentService(
         new
         {
             name = "get_product_price",
-            description = "Obtiene precio exacto y detalles de un producto del catálogo",
+            description = "Obtiene precio exacto y detalles de un producto del catálogo. USA ESTA TOOL para cualquier pregunta de precio de METROPOLE, BOSS, E.ARMANI, CROCODILE, ANGEL_EYES o COMBOS_LOVE.",
             input_schema = new
             {
                 type = "object",
@@ -62,6 +62,24 @@ public sealed class AgentService(
                     sku = new { type = "string", description = "Código del producto" }
                 },
                 required = new[] { "sku" }
+            }
+        },
+        new
+        {
+            name = "answer_general",
+            description = "Responde preguntas de política de tienda (envíos, pagos, devoluciones, horario) o mensajes generales que no requieren consultar precio ni stock.",
+            input_schema = new
+            {
+                type = "object",
+                properties = new
+                {
+                    answer = new
+                    {
+                        type = "string",
+                        description = "Respuesta en español, máximo 2 oraciones, sin emojis"
+                    }
+                },
+                required = new[] { "answer" }
             }
         }
     ];
@@ -101,6 +119,7 @@ public sealed class AgentService(
                 max_tokens = 512,   // room for tool_use blocks; final response capped at maxTokens
                 system = ctx.BusinessPrompt,
                 tools = ToolDefinitions,
+                tool_choice = new { type = "any" },
                 messages = new[] { new { role = "user", content = userContent } }
             };
 
@@ -121,6 +140,19 @@ public sealed class AgentService(
                     var toolId = block.GetProperty("id").GetString()!;
                     var toolName = block.GetProperty("name").GetString()!;
                     var toolInput = block.GetProperty("input");
+
+                    // answer_general returns the answer directly — no second API call needed
+                    if (toolName == "answer_general" &&
+                        toolInput.TryGetProperty("answer", out var ansEl))
+                    {
+                        var direct = ansEl.GetString()?.Trim();
+                        if (!string.IsNullOrEmpty(direct))
+                        {
+                            logger.LogDebug("Tool answer_general for contact {ContactId}", ctx.ContactId);
+                            return direct.Equals("ESCALAR", StringComparison.OrdinalIgnoreCase) ? null : direct;
+                        }
+                    }
+
                     var result = ProductCatalog.ExecuteToolCall(toolName, toolInput, catalog);
                     toolResults.Add(new { type = "tool_result", tool_use_id = toolId, content = result });
                     logger.LogDebug("Tool {Tool} called for contact {ContactId}, result: {Result}", toolName, ctx.ContactId, result);
