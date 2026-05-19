@@ -23,8 +23,9 @@ npm run lint                                       # frontend
 ## Pointers
 
 - Domain + backlog: `docs/CONTEXT.md`
+- Docs governance + naming: `docs/DOCS.md`
 - Agents + team-1: `docs/AGENTS.md`
-- Specs: `docs/specs/<feat>/spdd.md`
+- Specs: `docs/specs/<feat>/spdd.md` (ver convención en `docs/DOCS.md`)
 - ADRs: `docs/adr/`
 - Track 1 SOPs: `docs/track1-ghl/`
 - Track 2 compliance: `docs/track2-hipaa/`
