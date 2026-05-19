@@ -17,6 +17,7 @@ builder.Services.AddScoped<IWhatsAppService, WhatsAppService>();
 builder.Services.AddScoped<IAgentService, AgentService>();
 builder.Services.AddScoped<IAgentMemoryRepository, AgentMemoryRepository>();
 builder.Services.AddScoped<IMemoryExtractorService, MemoryExtractorService>();
+builder.Services.AddScoped<IConversationWindowService, ConversationWindowService>();
 
 var app = builder.Build();
 

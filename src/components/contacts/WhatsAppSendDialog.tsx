@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Send } from "lucide-react";
 
@@ -62,6 +63,11 @@ const TEMPLATES = [
   },
 ];
 
+interface WindowStatus {
+  isOpen: boolean;
+  secondsRemaining: number | null;
+}
+
 interface WhatsAppSendDialogProps {
   open: boolean;
   onClose: () => void;
@@ -73,6 +79,25 @@ export function WhatsAppSendDialog({ open, onClose, contactId, contactName }: Wh
   const [selectedTemplate, setSelectedTemplate] = useState("");
   const [params, setParams] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
+  const [mode, setMode] = useState<"template" | "freetext">("template");
+  const [freeText, setFreeText] = useState("");
+  const [windowStatus, setWindowStatus] = useState<WindowStatus | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setFreeText("");
+      setMode("template");
+      setWindowStatus(null);
+      return;
+    }
+    fetch(`/api/contacts/${contactId}/wa-window`)
+      .then((r) => r.json())
+      .then((data: { isOpen: boolean; secondsRemaining: number | null }) => {
+        setWindowStatus({ isOpen: data.isOpen, secondsRemaining: data.secondsRemaining });
+        if (data.isOpen) setMode("freetext");
+      })
+      .catch(() => setWindowStatus({ isOpen: false, secondsRemaining: null }));
+  }, [open, contactId]);
 
   const template = TEMPLATES.find((t) => t.name === selectedTemplate);
 
@@ -84,21 +109,25 @@ export function WhatsAppSendDialog({ open, onClose, contactId, contactName }: Wh
   };
 
   const handleSend = async () => {
-    if (!template) return;
     setSending(true);
     try {
-      const res = await fetch(`/api/contacts/${contactId}/whatsapp/send`, {
+      const body =
+        mode === "freetext"
+          ? { type: "text" as const, content: freeText }
+          : {
+              type: "template" as const,
+              templateName: template!.name,
+              languageCode: template!.language,
+              parameters: params,
+            };
+      const res = await fetch(`/api/contacts/${contactId}/wa-send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          templateName: template.name,
-          languageCode: template.language,
-          parameters: params,
-        }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Error al enviar");
+        throw new Error((data as { error?: string }).error ?? "Error al enviar");
       }
       toast.success(`Mensaje enviado a ${contactName}`);
       onClose();
@@ -109,7 +138,15 @@ export function WhatsAppSendDialog({ open, onClose, contactId, contactName }: Wh
     }
   };
 
-  const canSend = !!template && params.every((p) => p.trim().length > 0);
+  const canSend =
+    mode === "freetext"
+      ? freeText.trim().length > 0
+      : !!template && params.every((p) => p.trim().length > 0);
+
+  const hoursRemaining =
+    windowStatus?.isOpen && windowStatus.secondsRemaining != null
+      ? Math.floor(windowStatus.secondsRemaining / 3600)
+      : null;
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -118,44 +155,84 @@ export function WhatsAppSendDialog({ open, onClose, contactId, contactName }: Wh
           <DialogTitle>Enviar WhatsApp — {contactName}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label>Plantilla</Label>
-            <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecciona una plantilla" />
-              </SelectTrigger>
-              <SelectContent>
-                {TEMPLATES.map((t) => (
-                  <SelectItem key={t.name} value={t.name}>
-                    <div className="flex items-center gap-2">
-                      <span>{t.label}</span>
-                      <Badge variant="outline" className="text-xs py-0">{t.category}</Badge>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {template && (
-            <div className="space-y-3">
-              {template.params.map((p, i) => (
-                <div key={i} className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">
-                    {`{{${i + 1}}}`} · {p.label}
-                  </Label>
-                  <Input
-                    value={params[i] ?? ""}
-                    onChange={(e) => {
-                      const next = [...params];
-                      next[i] = e.target.value;
-                      setParams(next);
-                    }}
-                    placeholder={p.placeholder}
-                  />
-                </div>
-              ))}
+          {windowStatus?.isOpen && (
+            <div className="flex items-center justify-between">
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant={mode === "freetext" ? "default" : "outline"}
+                  onClick={() => setMode("freetext")}
+                >
+                  Texto libre
+                </Button>
+                <Button
+                  size="sm"
+                  variant={mode === "template" ? "default" : "outline"}
+                  onClick={() => setMode("template")}
+                >
+                  Plantilla
+                </Button>
+              </div>
+              {hoursRemaining != null && (
+                <span className="text-xs text-green-600 font-medium">
+                  Ventana abierta · {hoursRemaining}h restantes
+                </span>
+              )}
             </div>
+          )}
+
+          {mode === "freetext" ? (
+            <div className="space-y-1.5">
+              <Label>Mensaje</Label>
+              <Textarea
+                value={freeText}
+                onChange={(e) => setFreeText(e.target.value)}
+                placeholder="Escribe tu mensaje..."
+                rows={4}
+              />
+            </div>
+          ) : (
+            <>
+              <div className="space-y-1.5">
+                <Label>Plantilla</Label>
+                <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona una plantilla" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TEMPLATES.map((t) => (
+                      <SelectItem key={t.name} value={t.name}>
+                        <div className="flex items-center gap-2">
+                          <span>{t.label}</span>
+                          <Badge variant="outline" className="text-xs py-0">{t.category}</Badge>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {template && (
+                <div className="space-y-3">
+                  {template.params.map((p, i) => (
+                    <div key={i} className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">
+                        {`{{${i + 1}}}`} · {p.label}
+                      </Label>
+                      <Input
+                        value={params[i] ?? ""}
+                        onChange={(e) => {
+                          const next = [...params];
+                          next[i] = e.target.value;
+                          setParams(next);
+                        }}
+                        placeholder={p.placeholder}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
 
           <div className="flex justify-end gap-2 pt-2">

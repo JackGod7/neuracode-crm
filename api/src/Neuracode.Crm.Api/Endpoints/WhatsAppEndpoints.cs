@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Neuracode.Crm.Api.Endpoints;
 
 public record WhatsAppSendRequest(string TemplateName, string? LanguageCode, string[]? Parameters);
+public record WaSendRequest(string Type, string? Content, string? TemplateName, string? LanguageCode, string[]? Parameters);
 
 public static class WhatsAppEndpoints
 {
@@ -47,6 +48,8 @@ public static class WhatsAppEndpoints
         app.MapPost("/api/contacts/{id}/whatsapp/send", SendTemplate).WithTags("whatsapp");
         app.MapPost("/api/contacts/{id}/handoff", Handoff).WithTags("whatsapp");
         app.MapPost("/api/contacts/{id}/bot-resume", BotResume).WithTags("whatsapp");
+        app.MapGet("/api/contacts/{id}/wa-window", GetWindow).WithTags("whatsapp");
+        app.MapPost("/api/contacts/{id}/wa-send", Send).WithTags("whatsapp");
         return app;
     }
 
@@ -304,6 +307,93 @@ public static class WhatsAppEndpoints
         contact.UpdatedAt = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         await db.SaveChangesAsync();
         return Results.Ok(new { success = true, botHandling = true });
+    }
+
+    static async Task<IResult> GetWindow(string id, AppDbContext db, IConversationWindowService windowService)
+    {
+        var contact = await db.Contacts.FindAsync(id);
+        if (contact is null) return Results.NotFound();
+        if (string.IsNullOrEmpty(contact.WaId))
+            return Results.Ok(new { isOpen = false, expiresAt = (string?)null, secondsRemaining = (int?)null });
+
+        var window = await windowService.GetWindowAsync(contact.WaId);
+        return Results.Ok(new
+        {
+            isOpen = window.IsOpen,
+            expiresAt = window.ExpiresAt?.ToString("O"),
+            secondsRemaining = window.SecondsRemaining
+        });
+    }
+
+    static async Task<IResult> Send(
+        string id, WaSendRequest body, AppDbContext db,
+        IWhatsAppService whatsApp, IConversationWindowService windowService)
+    {
+        var contact = await db.Contacts.FindAsync(id);
+        if (contact is null) return Results.NotFound();
+
+        if (string.IsNullOrEmpty(contact.WaId))
+            return Results.BadRequest(new { error = "El contacto no tiene wa_id" });
+
+        if (contact.OptedOut)
+            return Results.BadRequest(new { error = "El contacto ha dado opt-out de mensajes WhatsApp" });
+
+        var now = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
+        if (body.Type == "text")
+        {
+            var window = await windowService.GetWindowAsync(contact.WaId);
+            if (!window.IsOpen)
+                return Results.BadRequest(new { error = "window closed, use template" });
+
+            if (string.IsNullOrWhiteSpace(body.Content))
+                return Results.BadRequest(new { error = "content es requerido para type=text" });
+
+            var (success, messageId) = await whatsApp.SendTextAsync(contact.WaId, body.Content);
+            if (!success) return Results.Json(new { error = "Meta API rechazó el mensaje" }, statusCode: 502);
+
+            db.Activities.Add(new Activity
+            {
+                Id = Guid.NewGuid().ToString(),
+                Type = ActivityTypes.WhatsAppOutbound,
+                Description = body.Content,
+                ContactId = contact.Id,
+                Wamid = messageId,
+                CreatedAt = now
+            });
+            await db.SaveChangesAsync();
+            return Results.Ok(new { success = true, messageId });
+        }
+
+        if (body.Type == "template")
+        {
+            if (string.IsNullOrWhiteSpace(body.TemplateName))
+                return Results.UnprocessableEntity(new { error = "templateName es requerido para type=template" });
+
+            var lang = body.LanguageCode ?? "es";
+            var parameters = body.Parameters ?? [];
+
+            bool success;
+            string? messageId;
+            try { (success, messageId) = await whatsApp.SendTemplateAsync(contact.WaId, body.TemplateName, lang, parameters); }
+            catch (InvalidOperationException ex) { return Results.Json(new { error = ex.Message }, statusCode: 503); }
+
+            if (!success) return Results.Json(new { error = "Meta API rechazó el mensaje" }, statusCode: 502);
+
+            db.Activities.Add(new Activity
+            {
+                Id = Guid.NewGuid().ToString(),
+                Type = ActivityTypes.WhatsAppOutbound,
+                Description = $"Template enviado: {body.TemplateName}",
+                ContactId = contact.Id,
+                Wamid = messageId,
+                CreatedAt = now
+            });
+            await db.SaveChangesAsync();
+            return Results.Ok(new { success = true, messageId });
+        }
+
+        return Results.BadRequest(new { error = "type debe ser 'text' o 'template'" });
     }
 
     static string ResolveDisplayName(JsonElement contactsEl, string waId)
