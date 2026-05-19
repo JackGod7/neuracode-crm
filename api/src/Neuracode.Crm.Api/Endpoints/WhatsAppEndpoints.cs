@@ -227,9 +227,15 @@ public static class WhatsAppEndpoints
                                         .ToListAsync();
 
                                     var memory = await scopedMemoryRepo.GetAsync(capturedWaId);
-                                    var businessPrompt = capturedConfig["AGENT_BUSINESS_PROMPT"] ?? DefaultBusinessPrompt;
+                                    var basePrompt = capturedConfig["AGENT_BUSINESS_PROMPT"] ?? DefaultBusinessPrompt;
                                     var catalogJson = (await scopedDb.CrmSettings.FindAsync(ProductCatalog.SettingsKey))?.Value;
                                     var catalog = catalogJson is not null ? ProductCatalog.Parse(catalogJson) : ProductCatalog.Default;
+                                    var catalogBlock = "Precios exactos del catálogo (usa estos números exactos):\n" +
+                                        string.Join("\n", catalog.Select(p =>
+                                            $"- {p.Name}: S/. {p.PriceMin}–{p.PriceMax} ({(p.InStock ? "disponible" : "agotado")})"));
+                                    var businessPrompt = basePrompt.Replace(
+                                        "SIEMPRE llama get_product_price(sku) para precio exacto. NUNCA inventes ni improvises precios.",
+                                        catalogBlock);
                                     var ctx = new AgentContext(freshContact.Id, capturedWaId, capturedDisplayName, combined, recentMsgs, businessPrompt, memory, catalog);
                                     var agentReply = await scopedAgent.HandleAsync(ctx);
 

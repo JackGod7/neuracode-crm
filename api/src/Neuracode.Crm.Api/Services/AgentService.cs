@@ -116,10 +116,8 @@ public sealed class AgentService(
             var requestBody = new
             {
                 model,
-                max_tokens = 512,   // room for tool_use blocks; final response capped at maxTokens
+                max_tokens = maxTokens,
                 system = ctx.BusinessPrompt,
-                tools = ToolDefinitions,
-                tool_choice = new { type = "any" },
                 messages = new[] { new { role = "user", content = userContent } }
             };
 
@@ -127,59 +125,6 @@ public sealed class AgentService(
             if (!resp.IsSuccessStatusCode) return null;
 
             var json = await resp.Content.ReadFromJsonAsync<JsonElement>(cts.Token);
-
-            // Tool use loop (max 1 round-trip per N1)
-            if (json.TryGetProperty("stop_reason", out var sr) && sr.GetString() == "tool_use" &&
-                json.TryGetProperty("content", out var assistantContent))
-            {
-                var toolResults = new List<object>();
-
-                foreach (var block in assistantContent.EnumerateArray())
-                {
-                    if (!block.TryGetProperty("type", out var bt) || bt.GetString() != "tool_use") continue;
-                    var toolId = block.GetProperty("id").GetString()!;
-                    var toolName = block.GetProperty("name").GetString()!;
-                    var toolInput = block.GetProperty("input");
-
-                    // answer_general returns the answer directly — no second API call needed
-                    if (toolName == "answer_general" &&
-                        toolInput.TryGetProperty("answer", out var ansEl))
-                    {
-                        var direct = ansEl.GetString()?.Trim();
-                        if (!string.IsNullOrEmpty(direct))
-                        {
-                            logger.LogDebug("Tool answer_general for contact {ContactId}", ctx.ContactId);
-                            return direct.Equals("ESCALAR", StringComparison.OrdinalIgnoreCase) ? null : direct;
-                        }
-                    }
-
-                    var result = ProductCatalog.ExecuteToolCall(toolName, toolInput, catalog);
-                    toolResults.Add(new { type = "tool_result", tool_use_id = toolId, content = result });
-                    logger.LogDebug("Tool {Tool} called for contact {ContactId}, result: {Result}", toolName, ctx.ContactId, result);
-                }
-
-                if (toolResults.Count > 0)
-                {
-                    var body2 = new
-                    {
-                        model,
-                        max_tokens = maxTokens,
-                        system = ctx.BusinessPrompt,
-                        tools = ToolDefinitions,
-                        messages = new object[]
-                        {
-                            new { role = "user", content = userContent },
-                            new { role = "assistant", content = assistantContent },
-                            new { role = "user", content = toolResults }
-                        }
-                    };
-
-                    resp = await client.PostAsJsonAsync(AnthropicUrl, body2, cts.Token);
-                    if (!resp.IsSuccessStatusCode) return null;
-                    json = await resp.Content.ReadFromJsonAsync<JsonElement>(cts.Token);
-                }
-            }
-
             var text = ExtractText(json);
             if (string.IsNullOrEmpty(text)) return null;
             if (text.Equals("ESCALAR", StringComparison.OrdinalIgnoreCase))
