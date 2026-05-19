@@ -32,7 +32,7 @@ public static class WhatsAppEndpoints
         "- Brazaletes/pulseras para caballero: METROPOLE, BOSS, E.ARMANI, CROCODILE\n" +
         "- Brazaletes/pulseras para dama: ANGEL EYES\n" +
         "- Combos para parejas: Combos Love (brazalete caballero + pulsera dama)\n" +
-        "- Precios: usa get_product_price(sku) para precio exacto por colección (rango general S/. 149–607)\n\n" +
+        "- Precios: SIEMPRE llama get_product_price(sku) para precio exacto. NUNCA inventes ni improvises precios.\n\n" +
         "Política de la tienda:\n" +
         "- Envíos: todo Perú + internacional; 2-3 días hábiles a provincias\n" +
         "- Pagos: Yape, Plin, transferencia bancaria, tarjeta de crédito/débito, contra entrega\n" +
