@@ -98,7 +98,7 @@ public sealed class AgentService(
             var requestBody = new
             {
                 model,
-                max_tokens = maxTokens,
+                max_tokens = 512,   // room for tool_use blocks; final response capped at maxTokens
                 system = ctx.BusinessPrompt,
                 tools = ToolDefinitions,
                 messages = new[] { new { role = "user", content = userContent } }
