@@ -86,31 +86,39 @@ Intake (webhook / import / manual)
 
 ### En progreso
 
-- [ ] WhatsApp AI agent — L2 memoria conversacional (`docs/specs/whatsapp-agent/roadmap.md`)
-  - [ ] Tabla `agent_memory` (waId, key, value, updated_at)
-  - [ ] Extracción JSON post-turn (segundo LLM call)
-  - [ ] Inyectar contexto en prompt
 - [ ] Templates WhatsApp en español: crear en Meta Business Manager (aprobación 24-48h)
 - [ ] GHL reseller SOPs — `docs/track1-ghl/`
 
-### Pendiente
+### Pendiente — Agent
 
-- [ ] WhatsApp UI: botón "Enviar" + historial en detalle de contacto (frontend, sprint futuro)
+- [ ] L3 tool use: `get_product_price(sku)`, `check_stock(sku)` via Anthropic tools API — necesario para eval `precio_coleccion_boss` precision≥4
+- [ ] L4 state machine: greeting→discovery→recommendation→close — persistir estado en `agent_memory`
+- [ ] L5 tono humano: variante de saludos, usar nombre real del cliente, typing delay (Meta API)
+- [ ] L6 handoff summary: al ESCALAR, generar resumen 3-bullet → guardar como Activity `handoff_summary`
+
+### Pendiente — Frontend
+
+- [ ] WhatsApp UI: botón "Enviar" + historial en detalle de contacto (wa-window endpoint ✅, UI pendiente)
+- [ ] `/wa-test`, `/deploy-railway`, `/spec-new` slash commands en `.claude/commands/`
+
+### Pendiente — Infra
+
+- [ ] GitHub Actions CI: `dotnet test` + `npm run lint` en PR gate (develop→main)
+- [ ] License file: cambiar a propietaria (no MIT)
 - [ ] Track 2 HIPAA stack bootstrap (ADR-0007)
 - [ ] Retell AI voice integration (ADR-0006)
 - [ ] SQLCipher swap para Track 2
 - [ ] BAA chain documentation (Retell → Neuracode → cliente)
 - [ ] Lead deduplication en import path
 - [ ] Source validation en ImportEndpoints
-- [ ] `next update` a 16.2.4 (security patch mayo 2026)
+- [ ] `next update` Next.js 16.2.4 (security patch)
 
 ### Deuda técnica conocida
 
-- [ ] Semaphore leak: `ConcurrentDictionary<string, SemaphoreSlim>` crece sin bound — implementar LRU/TTL eviction
-- [ ] Split transaction en `WhatsAppEndpoints.cs`: contact creado sin activities si segundo `SaveChanges` falla — wrappear en transacción
-- [ ] Magic strings: `AgentSignals` / `WaDirection` constants incompletos — extraer todos los string literals
-- [ ] `WhatsAppEndpoints.cs` 310 líneas, God handler (SRP violation) — extraer `InboundMessageHandler` + `ContactResolver`
-- [ ] `UnitTest1.cs` — dead code, eliminar
+- [ ] Semaphore leak: `ConcurrentDictionary<string, SemaphoreSlim>` crece sin bound — LRU/TTL eviction
+- [ ] Split transaction en `WhatsAppEndpoints.cs`: contact creado sin activities si segundo `SaveChanges` falla
+- [ ] `WhatsAppEndpoints.cs` ~450 líneas, God handler (SRP) — extraer `InboundMessageHandler` + `ContactResolver`
+- [ ] Magic strings: `AgentSignals` / `WaDirection` constants incompletos
 
 ### Completado
 
@@ -120,9 +128,16 @@ Intake (webhook / import / manual)
 - [x] LeadSource — catálogo canónico + whatsapp source
 - [x] N+1 fix en bulk import
 - [x] Dual-track strategy (ADR-0005)
-- [x] WhatsApp Business API backend (webhook inbound + outbound + DB schema + 139 tests) (2026-05-18)
-- [x] WhatsApp agent jewelry store prompt — "Accesorios Para Él" en producción Railway (2026-05-18)
-- [x] BUG-02: prompt clarifica productos fuera de catálogo (anillos, etc.) (2026-05-18)
-- [x] FK indexes: activities.contact_id, activities.deal_id, deals.contact_id, deals.stage_id, whatsapp_messages.wa_id (2026-05-18)
-- [x] Structured logging + correlation IDs para WhatsApp pipeline (2026-05-18)
-- [x] Mutex por waId + UNIQUE index contacts.wa_id (BUG-01 concurrencia) (2026-05-18)
+- [x] WhatsApp Business API backend (webhook inbound + outbound + DB schema) (2026-05-18)
+- [x] WhatsApp agent jewelry store — "Accesorios Para Él" en producción Railway (2026-05-18)
+- [x] BUG-02: prompt clarifica productos fuera de catálogo (2026-05-18)
+- [x] FK indexes: activities, deals, whatsapp_messages (2026-05-18)
+- [x] Structured logging + correlation IDs (2026-05-18)
+- [x] Mutex por waId + UNIQUE index contacts.wa_id (BUG-01) (2026-05-18)
+- [x] L2 memoria conversacional: `agent_memory` tabla + extracción JSON post-turn + inyección en prompt (2026-05-18)
+- [x] Debounce 4s: agrupa mensajes rápidos en un solo call al agente (2026-05-18)
+- [x] GET /api/contacts/{id}/chat — endpoint compacto para leer conversación (2026-05-18)
+- [x] LLM-as-Judge eval framework: 8 escenarios JSON + [Theory] xUnit + `LlmJudge` (Haiku) (2026-05-18)
+- [x] 24h conversation window: free-text cuando ventana abierta, template si cerrada (2026-05-18)
+- [x] Warmth prompt + max_tokens=120 guardrail (reemplaza post-processing frágil) (2026-05-18)
+- [x] Process: SPDD gates, TDD pre-commit hook, CLAUDE.md trim, REASONS template (2026-05-18)
